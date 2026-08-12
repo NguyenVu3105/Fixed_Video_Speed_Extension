@@ -116,7 +116,7 @@ function dispatchDetached(
  * Called by Integration.stop() to guarantee no dangling listeners after shutdown.
  */
 function detachAll(): void {
-  for (const [video, entry] of attached) {
+  for (const [video, entry] of [...attached.entries()]) {
     entry.cleanup();
     dispatchDetached(video, entry);
   }
@@ -141,6 +141,13 @@ function attach(video: HTMLVideoElement): void {
   let enforcing = false;
   let lastDispatchedRate: number | null = null;
 
+  function enforceSpeed(): void {
+    // A source observer callback can be queued just as the video is detached.
+    // Do not keep touching an element after its lifecycle has ended.
+    if (!attached.has(video)) return;
+    applySpeed(video, currentSpeed);
+  }
+
   function dispatchRate(rate: number): void {
     if (lastDispatchedRate === rate) return;
     lastDispatchedRate = rate;
@@ -148,8 +155,12 @@ function attach(video: HTMLVideoElement): void {
     if (event !== null) dispatch(event);
   }
 
-  function onLoadedMetadata(): void {
-    applySpeed(video, currentSpeed);
+  function onPlaybackReady(): void {
+    enforceSpeed();
+  }
+
+  function onPlaying(): void {
+    enforceSpeed();
   }
 
   function onRateChange(): void {
@@ -167,7 +178,7 @@ function attach(video: HTMLVideoElement): void {
   }
 
   function onPlay(): void {
-    applySpeed(video, currentSpeed);
+    enforceSpeed();
     const event = createEvent(video, 'play');
     if (event !== null) dispatch(event);
   }
@@ -180,20 +191,33 @@ function attach(video: HTMLVideoElement): void {
     if (event !== null) dispatch(event);
   }
 
-  video.addEventListener('loadedmetadata', onLoadedMetadata);
+  // Sites commonly reset playbackRate while loading a new source. These
+  // events cover both normal startup and a reused video element in a SPA.
+  video.addEventListener('loadstart', onPlaybackReady);
+  video.addEventListener('emptied', onPlaybackReady);
+  video.addEventListener('durationchange', onPlaybackReady);
+  video.addEventListener('loadedmetadata', onPlaybackReady);
+  video.addEventListener('loadeddata', onPlaybackReady);
+  video.addEventListener('canplay', onPlaybackReady);
   video.addEventListener('ratechange', onRateChange);
   video.addEventListener('play', onPlay);
-  video.addEventListener('playing', onPlay);
+  video.addEventListener('playing', onPlaying);
   video.addEventListener('pause', onPause);
   video.addEventListener('ended', onEnded);
 
-  applySpeed(video, currentSpeed);
-
+  let sourceObserver: MutationObserver | null = null;
   const cleanup = (): void => {
-    video.removeEventListener('loadedmetadata', onLoadedMetadata);
+    sourceObserver?.disconnect();
+    sourceObserver = null;
+    video.removeEventListener('loadstart', onPlaybackReady);
+    video.removeEventListener('emptied', onPlaybackReady);
+    video.removeEventListener('durationchange', onPlaybackReady);
+    video.removeEventListener('loadedmetadata', onPlaybackReady);
+    video.removeEventListener('loadeddata', onPlaybackReady);
+    video.removeEventListener('canplay', onPlaybackReady);
     video.removeEventListener('ratechange', onRateChange);
     video.removeEventListener('play', onPlay);
-    video.removeEventListener('playing', onPlay);
+    video.removeEventListener('playing', onPlaying);
     video.removeEventListener('pause', onPause);
     video.removeEventListener('ended', onEnded);
   };
@@ -208,7 +232,22 @@ function attach(video: HTMLVideoElement): void {
 
   attached.set(video, entry);
 
-  applySpeed(video, currentSpeed);
+  // There is no native "sourcechange" event. Watching the src attribute and
+  // <source> children catches YouTube/Bilibili source swaps, while the load
+  // events above cover programmatic reloads of the same source.
+  sourceObserver = new MutationObserver(() => {
+    enforceSpeed();
+  });
+  sourceObserver.observe(video, {
+    attributes: true,
+    attributeFilter: ['src'],
+    childList: true,
+    subtree: true,
+  });
+
+  // Apply immediately for videos already present when the content script
+  // starts, then keep re-applying at every startup/source lifecycle point.
+  enforceSpeed();
 
   // Notify subscribers a new video was attached — StatisticsService opens its session.
   const attachedEvent = createEvent(video, 'attached');

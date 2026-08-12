@@ -56,6 +56,19 @@ function ensureListener(): void {
   storageListenerAttached = true;
 }
 
+/** Removes the shared listener once the last context-local subscriber leaves. */
+function releaseListenerIfUnused(): void {
+  if (
+    !storageListenerAttached ||
+    settingsSubscribers.size > 0 ||
+    statisticsSubscribers.size > 0
+  ) {
+    return;
+  }
+  chrome.storage.local.onChanged.removeListener(onStorageChanged);
+  storageListenerAttached = false;
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -96,6 +109,7 @@ function subscribe(cb: SettingsChangeCallback): () => void {
   settingsSubscribers.add(cb);
   return () => {
     settingsSubscribers.delete(cb);
+    releaseListenerIfUnused();
   };
 }
 
@@ -109,6 +123,7 @@ function subscribeStatistics(cb: StatisticsChangeCallback): () => void {
   statisticsSubscribers.add(cb);
   return () => {
     statisticsSubscribers.delete(cb);
+    releaseListenerIfUnused();
   };
 }
 

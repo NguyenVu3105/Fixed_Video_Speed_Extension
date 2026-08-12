@@ -2,12 +2,16 @@ import { StorageService } from './StorageService';
 import { ObserverService } from './ObserverService';
 import { VideoController, type PlaybackEvent } from './VideoController';
 import { StatisticsService } from './statistics';
+import type { Settings } from '../types';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
 let running = false;
+let startPromise: Promise<void> | null = null;
 let unsubscribeStorage: (() => void) | null = null;
 let unsubscribePlayback: (() => void) | null = null;
+let latestSettings: Settings | null = null;
+let lifecycleVersion = 0;
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -18,7 +22,15 @@ let unsubscribePlayback: (() => void) | null = null;
  * session for the element.
  */
 function onVideoFound(video: HTMLVideoElement): void {
+  if (!running) return;
   VideoController.attach(video);
+}
+
+/** Detaches videos that were permanently removed from the document. */
+function onVideoRemoved(video: HTMLVideoElement): void {
+  if (!video.isConnected) {
+    VideoController.detach(video);
+  }
 }
 
 /**
@@ -39,6 +51,37 @@ function onVisibilityChange(): void {
   }
 }
 
+/**
+ * Keeps the settings subscription alive while the runtime is disabled. This
+ * is what allows an OFF -> ON change in the popup to start playback handling
+ * again without requiring a page reload.
+ */
+function onSettingsChanged(settings: Settings): void {
+  latestSettings = settings;
+
+  if (!settings.extensionEnabled) {
+    disable();
+    return;
+  }
+
+  if (running) {
+    VideoController.setSpeed(settings.playbackSpeed);
+    return;
+  }
+
+  // If startup is already reading storage, it will use latestSettings before
+  // attaching. Starting a second concurrent boot would create duplicate
+  // observers and listeners.
+  if (startPromise === null) {
+    void start();
+  }
+}
+
+function ensureSettingsSubscription(): void {
+  if (unsubscribeStorage !== null) return;
+  unsubscribeStorage = StorageService.subscribe(onSettingsChanged);
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -54,60 +97,84 @@ function onVisibilityChange(): void {
  */
 async function start(): Promise<void> {
   if (running) return;
-  running = true;
+  if (startPromise !== null) return startPromise;
 
-  const result = await StorageService.getSettings();
+  ensureSettingsSubscription();
+  const version = ++lifecycleVersion;
 
-  if (!result.ok) {
-    running = false;
-    return;
-  }
+  startPromise = (async () => {
+    const result = await StorageService.getSettings();
 
-  const { extensionEnabled, playbackSpeed } = result.value;
+    if (!result.ok || version !== lifecycleVersion) return;
 
-  if (!extensionEnabled) {
-    running = false;
-    return;
-  }
+    // A storage event may have arrived while getSettings() was pending. Use
+    // that newer snapshot instead of resurrecting a stale enabled state.
+    const settings = latestSettings ?? result.value;
+    latestSettings = settings;
 
-  VideoController.setSpeed(playbackSpeed);
-  ObserverService.start(onVideoFound);
-
-  unsubscribePlayback = VideoController.subscribe(onPlaybackEvent);
-  document.addEventListener('visibilitychange', onVisibilityChange);
-
-  unsubscribeStorage = StorageService.subscribe((settings) => {
     if (!settings.extensionEnabled) {
-      stop();
+      VideoController.setSpeed(1);
       return;
     }
+
     VideoController.setSpeed(settings.playbackSpeed);
+
+    // Subscribe before the observer scans the existing DOM. Otherwise the
+    // initial 'attached' events (and their statistics sessions) are lost.
+    unsubscribePlayback = VideoController.subscribe(onPlaybackEvent);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    running = true;
+    ObserverService.start(onVideoFound, onVideoRemoved);
+  })().finally(() => {
+    startPromise = null;
+    // An enable event can arrive while a cancelled startup is unwinding.
+    if (
+      !running &&
+      latestSettings?.extensionEnabled === true
+    ) {
+      void start();
+    }
   });
+
+  return startPromise;
 }
 
 /**
  * Tears down all services started by start().
  * Idempotent: safe to call when already stopped.
  */
-function stop(): void {
-  if (!running) return;
+function teardown(resetSpeed: boolean): void {
+  lifecycleVersion += 1;
   running = false;
 
   document.removeEventListener('visibilitychange', onVisibilityChange);
+
+  // Keep the playback subscription active until detachAll() has emitted the
+  // final events, otherwise StatisticsService keeps orphaned sessions.
+  if (resetSpeed) {
+    VideoController.setSpeed(1);
+  }
+
+  ObserverService.stop();
+  VideoController.detachAll();
 
   if (unsubscribePlayback !== null) {
     unsubscribePlayback();
     unsubscribePlayback = null;
   }
+}
 
-  // Close statistics sessions before detaching so pending deltas are flushed.
-  ObserverService.stop();
-  VideoController.detachAll();
+/** Disables runtime handling while retaining the settings listener for re-enable. */
+function disable(): void {
+  teardown(true);
+}
 
-  if (unsubscribeStorage !== null) {
-    unsubscribeStorage();
-    unsubscribeStorage = null;
-  }
+/** Fully tears down Integration, including its storage subscription. */
+function stop(): void {
+  teardown(false);
+  unsubscribeStorage?.();
+  unsubscribeStorage = null;
+  latestSettings = null;
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────
