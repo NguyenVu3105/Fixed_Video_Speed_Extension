@@ -1,7 +1,11 @@
 import type { Settings } from './settings';
+import type { Statistics } from './statistics';
 
 /** Callback invoked by StorageService when settings change. */
 export type SettingsChangeCallback = (settings: Settings) => void;
+
+/** Callback invoked by StorageService when statistics change. */
+export type StatisticsChangeCallback = (statistics: Statistics) => void;
 
 /** Opaque alias: semantic version string e.g. "1.0.0". */
 export type SemVer = string;

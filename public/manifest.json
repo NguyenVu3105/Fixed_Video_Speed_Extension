@@ -7,7 +7,9 @@
   "permissions": ["storage"],
 
   "host_permissions": [
+    "https://youtube.com/*",
     "https://*.youtube.com/*",
+    "https://bilibili.com/*",
     "https://*.bilibili.com/*"
   ],
 
@@ -23,10 +25,7 @@
 
   "content_scripts": [
     {
-      "matches": [
-        "https://*.youtube.com/*",
-        "https://*.bilibili.com/*"
-      ],
+      "matches": ["https://*.youtube.com/*", "https://*.bilibili.com/*"],
       "js": ["content/content.js"],
       "run_at": "document_idle"
     }

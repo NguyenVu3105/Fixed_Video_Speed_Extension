@@ -1,20 +1,42 @@
 import { StorageService } from './StorageService';
 import { ObserverService } from './ObserverService';
-import { VideoController } from './VideoController';
+import { VideoController, type PlaybackEvent } from './VideoController';
+import { StatisticsService } from './statistics';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
 let running = false;
 let unsubscribeStorage: (() => void) | null = null;
+let unsubscribePlayback: (() => void) | null = null;
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 /**
  * Called by ObserverService when a new video element is found in the DOM.
- * Attaches speed enforcement to the element.
+ * Attaches speed enforcement + the playback event bridge; the attach()
+ * immediately emits an 'attached' lifecycle event that opens the statistics
+ * session for the element.
  */
 function onVideoFound(video: HTMLVideoElement): void {
   VideoController.attach(video);
+}
+
+/**
+ * Forwards every bridged playback lifecycle event from VideoController to
+ * StatisticsService. The event carries complete metadata and a single
+ * timestamp — no DOM access needed on this side.
+ */
+function onPlaybackEvent(event: PlaybackEvent): void {
+  StatisticsService.handlePlaybackEvent(event);
+}
+
+/** Forwards tab visibility transitions to StatisticsService. */
+function onVisibilityChange(): void {
+  if (document.visibilityState === 'hidden') {
+    StatisticsService.notifyHidden();
+  } else {
+    StatisticsService.notifyVisible();
+  }
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -51,6 +73,9 @@ async function start(): Promise<void> {
   VideoController.setSpeed(playbackSpeed);
   ObserverService.start(onVideoFound);
 
+  unsubscribePlayback = VideoController.subscribe(onPlaybackEvent);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
   unsubscribeStorage = StorageService.subscribe((settings) => {
     if (!settings.extensionEnabled) {
       stop();
@@ -68,6 +93,14 @@ function stop(): void {
   if (!running) return;
   running = false;
 
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+
+  if (unsubscribePlayback !== null) {
+    unsubscribePlayback();
+    unsubscribePlayback = null;
+  }
+
+  // Close statistics sessions before detaching so pending deltas are flushed.
   ObserverService.stop();
   VideoController.detachAll();
 

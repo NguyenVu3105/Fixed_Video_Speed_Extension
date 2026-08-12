@@ -2,13 +2,37 @@ import type { ReactElement } from 'react';
 import { ToggleSwitch } from './ToggleSwitch';
 import { StatisticsCard } from './StatisticsCard';
 import { ActionButtons } from './ActionButtons';
+import type { StatisticsSummary } from '../../types';
 
 interface StatsCardProps {
+  readonly summary: StatisticsSummary | null;
   readonly overlayEnabled: boolean;
   readonly onToggleOverlay: (enabled: boolean) => void;
+  readonly exporting: boolean;
+  readonly importing: boolean;
+  readonly resetting: boolean;
+  readonly statusMessage: string | null;
+  readonly statusError: boolean;
+  readonly onExport: () => void;
+  readonly onImportReplace: () => void;
+  readonly onImportMerge: () => void;
+  readonly onReset: () => void;
 }
 
-export function StatsCard({ overlayEnabled, onToggleOverlay }: StatsCardProps): ReactElement {
+export function StatsCard({
+  summary,
+  overlayEnabled,
+  onToggleOverlay,
+  exporting,
+  importing,
+  resetting,
+  statusMessage,
+  statusError,
+  onExport,
+  onImportReplace,
+  onImportMerge,
+  onReset,
+}: StatsCardProps): ReactElement {
   return (
     <div className="card card-section">
       <ToggleSwitch
@@ -20,8 +44,18 @@ export function StatsCard({ overlayEnabled, onToggleOverlay }: StatsCardProps): 
       />
       <hr className="divider" />
       <span className="section-title">Statistics</span>
-      <StatisticsCard />
-      <ActionButtons />
+      <StatisticsCard today={summary?.today ?? null} allTime={summary?.total ?? null} />
+      <ActionButtons
+        exporting={exporting}
+        importing={importing}
+        resetting={resetting}
+        statusMessage={statusMessage}
+        statusError={statusError}
+        onExport={onExport}
+        onImportReplace={onImportReplace}
+        onImportMerge={onImportMerge}
+        onReset={onReset}
+      />
     </div>
   );
 }

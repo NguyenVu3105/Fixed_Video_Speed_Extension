@@ -1,7 +1,54 @@
+import type { SiteType } from '../types';
+import { detectSiteFromHost } from './statistics/helpers';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+/**
+ * Playback lifecycle events detected on attached video elements.
+ * StatisticsService consumes these via subscribe() and stays DOM-free.
+ * 'detached' is emitted right before an element is fully detached.
+ *
+ * Each event carries complete metadata captured once at attach() time plus a
+ * single dispatch-generated timestamp, so consumers never query the DOM or
+ * call Date.now() for the same event.
+ */
+export type PlaybackEventType =
+  | 'attached'
+  | 'play'
+  | 'pause'
+  | 'ended'
+  | 'ratechange'
+  | 'detached';
+
+export interface PlaybackEvent {
+  type: PlaybackEventType;
+  video: HTMLVideoElement;
+  /** Generated exactly once per event by dispatch(). */
+  timestamp: number;
+  /** Effective playbackRate at the moment the event fired. */
+  playbackSpeed: number;
+  title: string;
+  url: string;
+  site: SiteType;
+}
+
+/** Callback invoked for every confirmed playback lifecycle event. */
+export type PlaybackEventCallback = (event: PlaybackEvent) => void;
+
 // ─── State ───────────────────────────────────────────────────────────────────
 
-/** Map from video element to its ratechange cleanup function. */
-const attached = new Map<HTMLVideoElement, () => void>();
+/** Per-video registry entry holding listeners and attach-time metadata. */
+interface AttachedVideo {
+  cleanup: () => void;
+  title: string;
+  url: string;
+  site: SiteType;
+}
+
+/** Map from video element to its attached entry. */
+const attached = new Map<HTMLVideoElement, AttachedVideo>();
+
+const eventSubscribers = new Set<PlaybackEventCallback>();
 
 let currentSpeed = 1;
 
@@ -17,12 +64,61 @@ function applySpeed(video: HTMLVideoElement, speed: number): void {
 }
 
 /**
- * Removes all ratechange listeners and clears the attached map.
+ * Builds a complete event from the attach-time metadata and a single
+ * dispatch-generated timestamp. Returns null when the element is not attached.
+ */
+function createEvent(
+  video: HTMLVideoElement,
+  type: PlaybackEventType,
+): PlaybackEvent | null {
+  const meta = attached.get(video);
+  if (meta === undefined) return null;
+  return {
+    type,
+    video,
+    timestamp: Date.now(),
+    playbackSpeed: video.playbackRate,
+    title: meta.title,
+    url: meta.url,
+    site: meta.site,
+  };
+}
+
+/** Forwards a playback event to every subscriber. */
+function dispatch(event: PlaybackEvent): void {
+  for (const cb of eventSubscribers) {
+    cb(event);
+  }
+}
+
+/**
+ * Dispatches a detached event using preserved metadata (the entry may already
+ * be removed from the attached map by the caller).
+ */
+function dispatchDetached(
+  video: HTMLVideoElement,
+  meta: AttachedVideo,
+): void {
+  const event: PlaybackEvent = {
+    type: 'detached',
+    video,
+    timestamp: Date.now(),
+    playbackSpeed: video.playbackRate,
+    title: meta.title,
+    url: meta.url,
+    site: meta.site,
+  };
+  dispatch(event);
+}
+
+/**
+ * Removes all per-video listeners and clears the attached map.
  * Called by Integration.stop() to guarantee no dangling listeners after shutdown.
  */
 function detachAll(): void {
-  for (const cleanup of attached.values()) {
-    cleanup();
+  for (const [video, entry] of attached) {
+    entry.cleanup();
+    dispatchDetached(video, entry);
   }
   attached.clear();
 }
@@ -30,32 +126,93 @@ function detachAll(): void {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Attaches speed enforcement to `video`.
- * Listens for `ratechange` events and restores `currentSpeed` when the site
- * attempts to reset playback rate. Safe to call multiple times on the same
- * element (idempotent — second call is a no-op).
+ * Attaches speed enforcement and playback lifecycle detection to `video`.
+ *
+ * Speed enforcement: restores `currentSpeed` whenever the rate drifts from
+ * the global target. Lifecycle bridge: emits play/pause/ended events and
+ * confirmed rate changes to all subscribers, deduplicating consecutive
+ * rates and suppressing transient values produced during enforcement.
+ *
+ * Safe to call multiple times on the same element (second call is a no-op).
  */
 function attach(video: HTMLVideoElement): void {
   if (attached.has(video)) return;
 
   let enforcing = false;
+  let lastDispatchedRate: number | null = null;
+
+  function dispatchRate(rate: number): void {
+    if (lastDispatchedRate === rate) return;
+    lastDispatchedRate = rate;
+    const event = createEvent(video, 'ratechange');
+    if (event !== null) dispatch(event);
+  }
+
+  function onLoadedMetadata(): void {
+    applySpeed(video, currentSpeed);
+  }
 
   function onRateChange(): void {
     if (enforcing) return;
-    if (video.playbackRate === currentSpeed) return;
+    if (video.playbackRate === currentSpeed) {
+      dispatchRate(video.playbackRate);
+      return;
+    }
+    // The site reset the rate: report it, then enforce and confirm.
+    dispatchRate(video.playbackRate);
     enforcing = true;
     applySpeed(video, currentSpeed);
     enforcing = false;
+    dispatchRate(video.playbackRate);
   }
 
+  function onPlay(): void {
+    applySpeed(video, currentSpeed);
+    const event = createEvent(video, 'play');
+    if (event !== null) dispatch(event);
+  }
+  function onPause(): void {
+    const event = createEvent(video, 'pause');
+    if (event !== null) dispatch(event);
+  }
+  function onEnded(): void {
+    const event = createEvent(video, 'ended');
+    if (event !== null) dispatch(event);
+  }
+
+  video.addEventListener('loadedmetadata', onLoadedMetadata);
   video.addEventListener('ratechange', onRateChange);
+  video.addEventListener('play', onPlay);
+  video.addEventListener('playing', onPlay);
+  video.addEventListener('pause', onPause);
+  video.addEventListener('ended', onEnded);
+
   applySpeed(video, currentSpeed);
 
   const cleanup = (): void => {
+    video.removeEventListener('loadedmetadata', onLoadedMetadata);
     video.removeEventListener('ratechange', onRateChange);
+    video.removeEventListener('play', onPlay);
+    video.removeEventListener('playing', onPlay);
+    video.removeEventListener('pause', onPause);
+    video.removeEventListener('ended', onEnded);
   };
 
-  attached.set(video, cleanup);
+  // Capture page metadata at attach time so events never read the DOM later.
+  const entry: AttachedVideo = {
+    cleanup,
+    title: document.title,
+    url: window.location.href,
+    site: detectSiteFromHost(window.location.hostname),
+  };
+
+  attached.set(video, entry);
+
+  applySpeed(video, currentSpeed);
+
+  // Notify subscribers a new video was attached — StatisticsService opens its session.
+  const attachedEvent = createEvent(video, 'attached');
+  if (attachedEvent !== null) dispatch(attachedEvent);
 }
 
 /**
@@ -63,10 +220,13 @@ function attach(video: HTMLVideoElement): void {
  * Idempotent: safe to call on a video that was never attached.
  */
 function detach(video: HTMLVideoElement): void {
-  const cleanup = attached.get(video);
-  if (cleanup === undefined) return;
-  cleanup();
+  const entry = attached.get(video);
+  if (entry === undefined) return;
+  entry.cleanup();
   attached.delete(video);
+  // Final event: lets subscribers (statistics) close any open session.
+  // dispatchDetached uses preserved metadata — the entry is already removed.
+  dispatchDetached(video, entry);
 }
 
 /**
@@ -92,10 +252,24 @@ function forceSpeed(video: HTMLVideoElement): void {
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
+/**
+ * Subscribes to playback lifecycle events emitted by attached videos.
+ * Returns a cleanup function that removes the subscription.
+ */
+function subscribe(cb: PlaybackEventCallback): () => void {
+  eventSubscribers.add(cb);
+  return () => {
+    eventSubscribers.delete(cb);
+  };
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
 export const VideoController = {
   attach,
   detach,
   setSpeed,
   forceSpeed,
   detachAll,
+  subscribe,
 } as const;

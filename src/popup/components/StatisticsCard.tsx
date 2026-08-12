@@ -1,4 +1,8 @@
 import type { ReactElement } from 'react';
+import type { PeriodStats } from '../../types';
+import { formatDuration } from '../utils/formatters';
+
+const PLACEHOLDER = '—';
 
 interface StatItemProps {
   readonly icon: string;
@@ -20,26 +24,33 @@ function StatItem({ icon, label, value, highlight = false, full = false }: StatI
   );
 }
 
-export function StatisticsCard(): ReactElement {
+interface StatisticsCardProps {
+  readonly today: PeriodStats | null;
+  readonly allTime: PeriodStats | null;
+}
+
+export function StatisticsCard({ today, allTime }: StatisticsCardProps): ReactElement {
+  const watched = (p: PeriodStats | null): string =>
+    p === null ? PLACEHOLDER : formatDuration(p.watchedSeconds);
+  const saved = (p: PeriodStats | null): string =>
+    p === null ? PLACEHOLDER : formatDuration(p.savedSeconds);
+  const sessions = (p: PeriodStats | null): string =>
+    p === null ? PLACEHOLDER : String(p.sessionCount);
+
   return (
-    <div className="stats-grid">
-      <StatItem
-        icon="⏱️"
-        label="Today's Watch Time"
-        value="—"
-      />
-      <StatItem
-        icon="⚡"
-        label="Today's Saved Time"
-        value="—"
-        highlight
-      />
-      <StatItem
-        icon="🎬"
-        label="Videos Watched"
-        value="—"
-        full
-      />
+    <div>
+      <span className="section-title" style={{ display: 'block', marginBottom: '6px' }}>Today&rsquo;s Statistics</span>
+      <div className="stats-grid">
+        <StatItem icon="⏱️" label="Today — Watched Time" value={watched(today)} />
+        <StatItem icon="⚡" label="Today — Saved Time" value={saved(today)} highlight />
+        <StatItem icon="🎬" label="Today — Sessions" value={sessions(today)} full />
+      </div>
+      <span className="section-title" style={{ display: 'block', margin: '10px 0 6px' }}>All Time</span>
+      <div className="stats-grid">
+        <StatItem icon="⏱️" label="All Time — Watched Time" value={watched(allTime)} />
+        <StatItem icon="⚡" label="All Time — Saved Time" value={saved(allTime)} highlight />
+        <StatItem icon="🎬" label="All Time — Sessions" value={sessions(allTime)} full />
+      </div>
     </div>
   );
 }

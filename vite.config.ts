@@ -16,14 +16,11 @@ export default defineConfig({
         popup: resolve(import.meta.dirname, 'popup/index.html'),
         // Background service worker
         background: resolve(import.meta.dirname, 'src/background/background.ts'),
-        // Content script
-        content: resolve(import.meta.dirname, 'src/content/content.ts'),
       },
       output: {
         // Route each entry to its correct folder in dist/
         entryFileNames: (chunk) => {
           if (chunk.name === 'background') return 'background/background.js';
-          if (chunk.name === 'content') return 'content/content.js';
           return 'popup/[name]-[hash].js';
         },
         chunkFileNames: 'popup/chunks/[name]-[hash].js',

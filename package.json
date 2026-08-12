@@ -1,11 +1,14 @@
 {
   "name": "fixed-speed-video-extension",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Keep video playback speed fixed on YouTube and Bilibili.",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && npm run build:app && npm run build:content",
+    "build:app": "vite build",
+    "build:content": "vite build -c vite.content.config.ts",
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint",
     "preview": "vite preview"
