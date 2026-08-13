@@ -12,7 +12,6 @@ import { formatDuration } from "./utils/formatters";
 import { Header } from "./components/Header";
 import { SettingsCard } from "./components/SettingsCard";
 import { StatsCard } from "./components/StatsCard";
-import { Footer } from "./components/Footer";
 import { CustomSitesCard } from "./components/CustomSitesCard";
 import type { CurrentSite } from "./utils/currentSite";
 import { getCurrentSite } from "./utils/currentSite";
@@ -31,7 +30,6 @@ function LoadingView(): ReactElement {
       >
         <span className="loading-state__text">Loading…</span>
       </div>
-      <Footer />
     </div>
   );
 }
@@ -335,13 +333,17 @@ export function App(): ReactElement {
 
   return (
     <div className="popup-wrapper">
-      <Header />
+      <Header
+        enabled={settings.extensionEnabled}
+        supported={currentSiteLoading || currentSite?.supported === true}
+      />
       <SettingsCard
         settings={settings}
         onToggleEnabled={handleToggleEnabled}
         onSpeedChange={handleSpeedChange}
         currentSite={currentSite}
         currentSiteLoading={currentSiteLoading}
+        onAddDomain={handleAddCustomSite}
       />
       <CustomSitesCard
         sites={settings.customSites}
@@ -367,7 +369,6 @@ export function App(): ReactElement {
           void handleReset();
         }}
       />
-      <Footer />
       <input
         ref={fileInputRef}
         type="file"

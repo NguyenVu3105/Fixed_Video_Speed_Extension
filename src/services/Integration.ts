@@ -5,6 +5,7 @@ import { StatisticsService } from './statistics';
 import type { Settings } from '../types';
 import { isHostSupported, normalizeHostname } from './sites';
 import { getHostSpeed } from './siteSettings';
+import { OverlayService } from './OverlayService';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -31,12 +32,14 @@ function shouldRun(settings: Settings): boolean {
 function onVideoFound(video: HTMLVideoElement): void {
   if (!running) return;
   VideoController.attach(video);
+  OverlayService.attach(video);
 }
 
 /** Detaches videos that were permanently removed from the document. */
 function onVideoRemoved(video: HTMLVideoElement): void {
   if (!video.isConnected) {
     VideoController.detach(video);
+    OverlayService.detach(video);
   }
 }
 
@@ -73,6 +76,7 @@ function onSettingsChanged(settings: Settings): void {
 
   if (running) {
     VideoController.setSpeed(getHostSpeed(settings, currentHost));
+    OverlayService.setEnabled(settings.overlayEnabled);
     return;
   }
 
@@ -131,6 +135,7 @@ async function start(): Promise<void> {
     unsubscribePlayback = VideoController.subscribe(onPlaybackEvent);
     document.addEventListener('visibilitychange', onVisibilityChange);
     running = true;
+    OverlayService.setEnabled(settings.overlayEnabled);
     ObserverService.start(onVideoFound, onVideoRemoved);
   })().finally(() => {
     startPromise = null;
@@ -164,6 +169,7 @@ function teardown(resetSpeed: boolean): void {
   }
 
   ObserverService.stop();
+  OverlayService.setEnabled(false);
   VideoController.detachAll();
 
   if (unsubscribePlayback !== null) {

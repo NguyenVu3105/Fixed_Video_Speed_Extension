@@ -39,23 +39,33 @@ export function StatsCard({
         id="toggle-overlay"
         checked={overlayEnabled}
         label="Speed Overlay"
-        subLabel="Show indicator on videos"
+        subLabel="Show the current speed on each video"
         onChange={onToggleOverlay}
       />
       <hr className="divider" />
-      <span className="section-title">Statistics</span>
-      <StatisticsCard today={summary?.today ?? null} allTime={summary?.total ?? null} />
-      <ActionButtons
-        exporting={exporting}
-        importing={importing}
-        resetting={resetting}
-        statusMessage={statusMessage}
-        statusError={statusError}
-        onExport={onExport}
-        onImportReplace={onImportReplace}
-        onImportMerge={onImportMerge}
-        onReset={onReset}
-      />
+      <details className="stats-disclosure">
+        <summary className="stats-disclosure__summary">
+          <span>
+            <span className="section-title">Statistics</span>
+            <span className="stats-disclosure__hint">Watch time, saved time and sessions</span>
+          </span>
+          <span className="stats-disclosure__chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div className="stats-disclosure__content">
+          <StatisticsCard today={summary?.today ?? null} allTime={summary?.total ?? null} />
+          <ActionButtons
+            exporting={exporting}
+            importing={importing}
+            resetting={resetting}
+            statusMessage={statusMessage}
+            statusError={statusError}
+            onExport={onExport}
+            onImportReplace={onImportReplace}
+            onImportMerge={onImportMerge}
+            onReset={onReset}
+          />
+        </div>
+      </details>
     </div>
   );
 }

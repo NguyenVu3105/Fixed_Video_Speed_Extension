@@ -39,17 +39,17 @@ export function StatisticsCard({ today, allTime }: StatisticsCardProps): ReactEl
 
   return (
     <div>
-      <span className="section-title" style={{ display: 'block', marginBottom: '6px' }}>Today&rsquo;s Statistics</span>
+      <span className="stats-group-title">Today</span>
       <div className="stats-grid">
-        <StatItem icon="⏱️" label="Today — Watched Time" value={watched(today)} />
-        <StatItem icon="⚡" label="Today — Saved Time" value={saved(today)} highlight />
-        <StatItem icon="🎬" label="Today — Sessions" value={sessions(today)} full />
+        <StatItem icon="◷" label="Watched" value={watched(today)} />
+        <StatItem icon="↯" label="Saved" value={saved(today)} highlight />
+        <StatItem icon="▣" label="Sessions" value={sessions(today)} full />
       </div>
-      <span className="section-title" style={{ display: 'block', margin: '10px 0 6px' }}>All Time</span>
+      <span className="stats-group-title stats-group-title--spaced">All time</span>
       <div className="stats-grid">
-        <StatItem icon="⏱️" label="All Time — Watched Time" value={watched(allTime)} />
-        <StatItem icon="⚡" label="All Time — Saved Time" value={saved(allTime)} highlight />
-        <StatItem icon="🎬" label="All Time — Sessions" value={sessions(allTime)} full />
+        <StatItem icon="◷" label="Watched" value={watched(allTime)} />
+        <StatItem icon="↯" label="Saved" value={saved(allTime)} highlight />
+        <StatItem icon="▣" label="Sessions" value={sessions(allTime)} full />
       </div>
     </div>
   );

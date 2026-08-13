@@ -1,11 +1,11 @@
-import type { ReactElement } from 'react';
-import type { Settings } from '../../types';
-import { ToggleSwitch } from './ToggleSwitch';
-import { SpeedSlider } from './SpeedSlider';
-import { QuickSpeedButtons } from './QuickSpeedButtons';
-import { CurrentSiteIndicator } from './CurrentSiteIndicator';
-import type { CurrentSite } from '../utils/currentSite';
-import { getSiteSpeed } from '../../services/siteSettings';
+import type { ReactElement } from "react";
+import type { Settings } from "../../types";
+import { ToggleSwitch } from "./ToggleSwitch";
+import { SpeedSlider } from "./SpeedSlider";
+import { QuickSpeedButtons } from "./QuickSpeedButtons";
+import { CurrentSiteIndicator } from "./CurrentSiteIndicator";
+import type { CurrentSite } from "../utils/currentSite";
+import { getSiteSpeed } from "../../services/siteSettings";
 
 interface SettingsCardProps {
   readonly settings: Settings;
@@ -13,6 +13,7 @@ interface SettingsCardProps {
   readonly onSpeedChange: (speed: number) => void;
   readonly currentSite: CurrentSite | null;
   readonly currentSiteLoading: boolean;
+  readonly onAddDomain: (domain: string) => void;
 }
 
 export function SettingsCard({
@@ -21,16 +22,23 @@ export function SettingsCard({
   onSpeedChange,
   currentSite,
   currentSiteLoading,
+  onAddDomain,
 }: SettingsCardProps): ReactElement {
   const { extensionEnabled } = settings;
-  const siteSpeed = currentSite === null
-    ? settings.playbackSpeed
-    : getSiteSpeed(settings, currentSite.site, currentSite.hostname);
-  const siteSpeedAvailable = currentSite?.supported === true && !currentSiteLoading;
+  const siteSpeed =
+    currentSite === null
+      ? settings.playbackSpeed
+      : getSiteSpeed(settings, currentSite.site, currentSite.hostname);
+  const siteSpeedAvailable =
+    currentSite?.supported === true && !currentSiteLoading;
 
   return (
     <div className="card card-section">
-      <CurrentSiteIndicator site={currentSite} loading={currentSiteLoading} />
+      <CurrentSiteIndicator
+        site={currentSite}
+        loading={currentSiteLoading}
+        onAddDomain={onAddDomain}
+      />
       <hr className="divider" />
       <ToggleSwitch
         id="toggle-enabled"
@@ -39,17 +47,30 @@ export function SettingsCard({
         subLabel="Apply the saved speed for this site"
         onChange={onToggleEnabled}
       />
-      <hr className="divider" />
-      <SpeedSlider
-        speed={siteSpeed}
-        disabled={!extensionEnabled || !siteSpeedAvailable}
-        onChange={onSpeedChange}
-      />
-      <QuickSpeedButtons
-        activeSpeed={siteSpeed}
-        disabled={!extensionEnabled || !siteSpeedAvailable}
-        onSelect={onSpeedChange}
-      />
+      {extensionEnabled && siteSpeedAvailable && (
+        <>
+          <hr className="divider" />
+          <SpeedSlider
+            speed={siteSpeed}
+            disabled={false}
+            onChange={onSpeedChange}
+          />
+          <QuickSpeedButtons
+            activeSpeed={siteSpeed}
+            disabled={false}
+            onSelect={onSpeedChange}
+          />
+        </>
+      )}
+      {!extensionEnabled}
+      {extensionEnabled &&
+        !currentSiteLoading &&
+        currentSite !== null &&
+        !currentSite.supported && (
+          <p className="settings-hint">
+            Add this domain above to show speed controls.
+          </p>
+        )}
     </div>
   );
 }

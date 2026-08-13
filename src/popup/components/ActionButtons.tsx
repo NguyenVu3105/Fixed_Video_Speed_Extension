@@ -34,7 +34,6 @@ export function ActionButtons({
           disabled={exporting || importing}
           onClick={onImportReplace}
         >
-          <span className="action-btn__icon" aria-hidden="true">📥</span>
           {importing ? 'Importing…' : 'Replace'}
         </button>
         <button
@@ -45,7 +44,6 @@ export function ActionButtons({
           disabled={exporting || importing}
           onClick={onImportMerge}
         >
-          <span className="action-btn__icon" aria-hidden="true">📂</span>
           {importing ? 'Importing…' : 'Merge'}
         </button>
         <button
@@ -56,7 +54,6 @@ export function ActionButtons({
           disabled={exporting || importing}
           onClick={onExport}
         >
-          <span className="action-btn__icon" aria-hidden="true">📤</span>
           {exporting ? 'Exporting…' : 'Export'}
         </button>
         <button
@@ -67,7 +64,6 @@ export function ActionButtons({
           disabled={exporting || importing || resetting}
           onClick={onReset}
         >
-          <span className="action-btn__icon" aria-hidden="true">🗑️</span>
           {resetting ? 'Resetting…' : 'Reset'}
         </button>
       </div>
