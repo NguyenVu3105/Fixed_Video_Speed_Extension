@@ -2,16 +2,11 @@
   "manifest_version": 3,
   "name": "Fixed Video Speed",
   "version": "1.0.0",
-  "description": "Keep video playback speed fixed on YouTube and Bilibili.",
+  "description": "Keep video playback speed fixed across popular video websites and custom domains.",
 
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
 
-  "host_permissions": [
-    "https://youtube.com/*",
-    "https://*.youtube.com/*",
-    "https://bilibili.com/*",
-    "https://*.bilibili.com/*"
-  ],
+  "host_permissions": ["<all_urls>"],
 
   "background": {
     "service_worker": "background/background.js",
@@ -25,7 +20,7 @@
 
   "content_scripts": [
     {
-      "matches": ["https://*.youtube.com/*", "https://*.bilibili.com/*"],
+      "matches": ["<all_urls>"],
       "js": ["content/content.js"],
       "run_at": "document_idle"
     }

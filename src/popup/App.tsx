@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactElement } from "react";
 import type { Settings, Result, ImportMode, StatisticsSummary } from "../types";
-import { StorageService } from "../services/StorageService";
+import { DEFAULT_SETTINGS, StorageService } from "../services/StorageService";
 import {
   exportData,
   importData,
@@ -13,6 +13,10 @@ import { Header } from "./components/Header";
 import { SettingsCard } from "./components/SettingsCard";
 import { StatsCard } from "./components/StatsCard";
 import { Footer } from "./components/Footer";
+import { CustomSitesCard } from "./components/CustomSitesCard";
+import type { CurrentSite } from "./utils/currentSite";
+import { getCurrentSite } from "./utils/currentSite";
+import { findCustomSite, getSiteDefinition, normalizeCustomDomain } from "../services/sites";
 
 // ─── Loading State ────────────────────────────────────────────────────────────
 
@@ -36,6 +40,8 @@ function LoadingView(): ReactElement {
 
 export function App(): ReactElement {
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [currentSite, setCurrentSite] = useState<CurrentSite | null>(null);
+  const [currentSiteLoading, setCurrentSiteLoading] = useState(true);
   const [summary, setSummary] = useState<StatisticsSummary | null>(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -58,14 +64,7 @@ export function App(): ReactElement {
       if (result.ok) {
         setSettings(result.value);
       } else {
-        // Fallback: use DEFAULT_SETTINGS equivalent on error
-        setSettings({
-          extensionEnabled: true,
-          playbackSpeed: 1,
-          overlayEnabled: true,
-          autoApply: true,
-          supportedSites: ["youtube", "bilibili"],
-        });
+        setSettings(DEFAULT_SETTINGS);
       }
     });
 
@@ -96,6 +95,22 @@ export function App(): ReactElement {
       unsubscribeStats();
     };
   }, []);
+
+  useEffect(() => {
+    if (settings === null) return;
+    let mounted = true;
+    setCurrentSiteLoading(true);
+    getCurrentSite(settings)
+      .then((site) => {
+        if (mounted) setCurrentSite(site);
+      })
+      .finally(() => {
+        if (mounted) setCurrentSiteLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [settings]);
 
   // ── Save helper (deduplicates unchanged fields) ───────────────────────────
 
@@ -136,9 +151,26 @@ export function App(): ReactElement {
 
   const handleSpeedChange = useCallback(
     (speed: number) => {
-      save({ playbackSpeed: speed });
+      if (currentSite?.supported !== true || settings === null) return;
+      if (currentSite.custom) {
+        const customSite = findCustomSite(currentSite.hostname, settings.customSites);
+        if (customSite === null || customSite.speed === speed) return;
+        save({
+          customSites: settings.customSites.map((site) =>
+            site.domain === customSite.domain ? { ...site, speed } : site,
+          ),
+        });
+        return;
+      }
+      if (settings.siteSpeeds[currentSite.site] === speed) return;
+      save({
+        siteSpeeds: {
+          ...settings.siteSpeeds,
+          [currentSite.site]: speed,
+        },
+      });
     },
-    [save],
+    [currentSite, save, settings],
   );
 
   const handleToggleOverlay = useCallback(
@@ -154,6 +186,49 @@ export function App(): ReactElement {
     setStatusMessage(message);
     setStatusError(isError);
   }, []);
+
+  const handleAddCustomSite = useCallback(
+    (input: string) => {
+      if (settings === null) return;
+      const domain = normalizeCustomDomain(input);
+      if (domain === null) {
+        showStatus("Enter a valid domain, such as example.com.", true);
+        return;
+      }
+      if (getSiteDefinition(domain) !== null) {
+        showStatus("This website is already supported automatically.", true);
+        return;
+      }
+      if (settings.customSites.some((site) => site.domain === domain)) {
+        showStatus("This domain is already in your custom sites.", true);
+        return;
+      }
+      save({ customSites: [...settings.customSites, { domain, speed: 1 }] });
+      showStatus(`${domain} added.`, false);
+    },
+    [save, settings, showStatus],
+  );
+
+  const handleCustomSiteSpeedChange = useCallback(
+    (domain: string, speed: number) => {
+      if (settings === null) return;
+      save({
+        customSites: settings.customSites.map((site) =>
+          site.domain === domain ? { ...site, speed } : site,
+        ),
+      });
+    },
+    [save, settings],
+  );
+
+  const handleRemoveCustomSite = useCallback(
+    (domain: string) => {
+      if (settings === null) return;
+      save({ customSites: settings.customSites.filter((site) => site.domain !== domain) });
+      showStatus(`${domain} removed.`, false);
+    },
+    [save, settings, showStatus],
+  );
 
   const handleExport = useCallback(async () => {
     if (exportingRef.current) return;
@@ -265,6 +340,14 @@ export function App(): ReactElement {
         settings={settings}
         onToggleEnabled={handleToggleEnabled}
         onSpeedChange={handleSpeedChange}
+        currentSite={currentSite}
+        currentSiteLoading={currentSiteLoading}
+      />
+      <CustomSitesCard
+        sites={settings.customSites}
+        onAdd={handleAddCustomSite}
+        onChangeSpeed={handleCustomSiteSpeedChange}
+        onRemove={handleRemoveCustomSite}
       />
       <StatsCard
         summary={summary}

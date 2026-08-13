@@ -6,6 +6,7 @@ import type {
   WatchSession,
 } from '../../types';
 import { MAX_HISTORY } from './constants';
+export { detectSiteFromHost } from '../sites';
 
 // ─── Factories ───────────────────────────────────────────────────────────────
 
@@ -28,16 +29,6 @@ export function toDateKey(timestamp: number): DateKey {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-/**
- * Pure: derives the platform from a hostname string. The caller owns the
- * DOM access (window.location.hostname); this helper never touches the DOM.
- */
-export function detectSiteFromHost(host: string): SiteType {
-  if (host.includes('youtube.com')) return 'youtube';
-  if (host.includes('bilibili.com')) return 'bilibili';
-  return 'other';
 }
 
 // ─── Math ────────────────────────────────────────────────────────────────────
@@ -162,4 +153,3 @@ export function finalizeSessionInStatistics(
   stats.total.sessionCount += 1;
   pushHistory(stats, session);
 }
-

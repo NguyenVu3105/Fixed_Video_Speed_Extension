@@ -1,32 +1,18 @@
-# React + TypeScript + Vite
+# Fixed Video Speed
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Chrome MV3 extension that keeps HTML5 video playback at a saved speed.
 
-Currently, two official plugins are available:
+Supported platforms include YouTube, Bilibili, Vimeo, Twitch, Netflix,
+Disney+, Prime Video, Coursera, Udemy, edX, Khan Academy, Facebook Video, X,
+Reddit Video, and Dailymotion. Custom domains can be added from the popup and
+each domain can have its own speed.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Development
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Load the generated `dist/` directory from `chrome://extensions` with
+Developer mode enabled.

@@ -1,5 +1,11 @@
-export type { SiteType } from './site';
-export type { Settings, DefaultSettings } from './settings';
+export { SITE_TYPES, SUPPORTED_SITE_TYPES } from './site';
+export type { BuiltInSiteType, SiteType } from './site';
+export type {
+  CustomSite,
+  Settings,
+  DefaultSettings,
+  SiteSpeeds,
+} from './settings';
 export type { ExportPayload, ImportMode } from './importExport';
 export type {
   PlaybackSegment,

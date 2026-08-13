@@ -1,5 +1,5 @@
 import type { SiteType } from '../types';
-import { detectSiteFromHost } from './statistics/helpers';
+import { detectSiteFromHost } from './sites';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

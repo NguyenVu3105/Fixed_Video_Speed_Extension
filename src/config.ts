@@ -3,6 +3,7 @@
 
 // ─── Speed Domain ────────────────────────────────────────────────────────────
 
+export const DEFAULT_PLAYBACK_SPEED = 1;
 export const SPEED_MIN = 0.25;
 export const SPEED_MAX = 16;
 export const SPEED_STEP = 0.05;

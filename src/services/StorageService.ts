@@ -1,20 +1,29 @@
 import type {
+  CustomSite,
+  BuiltInSiteType,
+  SiteType,
   Settings,
   SettingsChangeCallback,
   Statistics,
   StatisticsChangeCallback,
   Result,
 } from '../types';
-import { STATISTICS_STORAGE_KEY } from '../config';
+import { DEFAULT_PLAYBACK_SPEED, STATISTICS_STORAGE_KEY } from '../config';
+import { SITE_TYPES, SUPPORTED_SITE_TYPES } from '../types';
+import { getSiteDefinition, normalizeCustomDomain } from './sites';
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   extensionEnabled: true,
-  playbackSpeed: 1,
+  playbackSpeed: DEFAULT_PLAYBACK_SPEED,
+  siteSpeeds: Object.fromEntries(
+    SITE_TYPES.map((site) => [site, DEFAULT_PLAYBACK_SPEED]),
+  ) as Record<SiteType, number>,
+  customSites: [],
   overlayEnabled: true,
   autoApply: true,
-  supportedSites: ['youtube', 'bilibili'],
+  supportedSites: [...SUPPORTED_SITE_TYPES],
 };
 
 const DEFAULT_STATISTICS: Statistics = {
@@ -31,15 +40,93 @@ let storageListenerAttached = false;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidSpeed(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function isSiteType(value: unknown): value is SiteType {
+  return typeof value === 'string' && SITE_TYPES.includes(value as SiteType);
+}
+
+function normalizeCustomSites(value: unknown): CustomSite[] {
+  if (!Array.isArray(value)) return [];
+  const normalized: CustomSite[] = [];
+  const seen = new Set<string>();
+
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const domain = normalizeCustomDomain(String(item['domain'] ?? ''));
+    const speed = item['speed'];
+    if (
+      domain === null ||
+      !isValidSpeed(speed) ||
+      getSiteDefinition(domain) !== null ||
+      seen.has(domain)
+    ) {
+      continue;
+    }
+    seen.add(domain);
+    normalized.push({ domain, speed });
+  }
+  return normalized;
+}
+
+/**
+ * Normalizes settings from storage and migrates the pre-Phase-2 shape.
+ * Old settings had only `playbackSpeed`; that value becomes the initial
+ * speed for every site, so upgrading does not silently change playback.
+ */
+export function normalizeSettings(value: unknown): Settings {
+  const stored = isRecord(value) ? value : {};
+  const legacySpeed = isValidSpeed(stored['playbackSpeed'])
+    ? stored['playbackSpeed']
+    : DEFAULT_PLAYBACK_SPEED;
+  const storedSiteSpeeds = isRecord(stored['siteSpeeds'])
+    ? stored['siteSpeeds']
+    : {};
+  const siteSpeeds = Object.fromEntries(
+    SITE_TYPES.map((site) => [
+      site,
+      isValidSpeed(storedSiteSpeeds[site]) ? storedSiteSpeeds[site] : legacySpeed,
+    ]),
+  ) as Record<SiteType, number>;
+  const supportedSites = Array.isArray(stored['supportedSites'])
+    ? stored['supportedSites'].filter(
+        (site): site is BuiltInSiteType => isSiteType(site) && site !== 'other',
+      )
+    : [...DEFAULT_SETTINGS.supportedSites];
+
+  return {
+    extensionEnabled:
+      typeof stored['extensionEnabled'] === 'boolean'
+        ? stored['extensionEnabled']
+        : DEFAULT_SETTINGS.extensionEnabled,
+    playbackSpeed: legacySpeed,
+    siteSpeeds,
+    customSites: normalizeCustomSites(stored['customSites']),
+    overlayEnabled:
+      typeof stored['overlayEnabled'] === 'boolean'
+        ? stored['overlayEnabled']
+        : DEFAULT_SETTINGS.overlayEnabled,
+    autoApply:
+      typeof stored['autoApply'] === 'boolean'
+        ? stored['autoApply']
+        : DEFAULT_SETTINGS.autoApply,
+    supportedSites,
+  };
+}
+
 function onStorageChanged(
   changes: Record<string, chrome.storage.StorageChange>,
 ): void {
   const settingsChange = changes['settings'];
-  if (settingsChange !== undefined && settingsChange.newValue !== undefined) {
-    const settings = settingsChange.newValue as Settings;
-    for (const cb of settingsSubscribers) {
-      cb(settings);
-    }
+  if (settingsChange !== undefined) {
+    const settings = normalizeSettings(settingsChange.newValue);
+    for (const cb of settingsSubscribers) cb(settings);
   }
   const statsChange = changes[STATISTICS_STORAGE_KEY];
   if (statsChange !== undefined && statsChange.newValue !== undefined) {
@@ -78,8 +165,7 @@ function releaseListenerIfUnused(): void {
 async function getSettings(): Promise<Result<Settings>> {
   try {
     const data = await chrome.storage.local.get('settings');
-    const stored = data['settings'] as Settings | undefined;
-    const settings: Settings = stored ?? DEFAULT_SETTINGS;
+    const settings = normalizeSettings(data['settings']);
     return { ok: true, value: settings };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -92,7 +178,7 @@ async function getSettings(): Promise<Result<Settings>> {
  */
 async function saveSettings(settings: Settings): Promise<Result<void>> {
   try {
-    await chrome.storage.local.set({ settings });
+    await chrome.storage.local.set({ settings: normalizeSettings(settings) });
     return { ok: true, value: undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

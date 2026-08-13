@@ -4,16 +4,20 @@ import type {
   WatchSession,
   PeriodStats,
   PlaybackSegment,
+  CustomSite,
+  BuiltInSiteType,
   SiteType,
   Result,
 } from '../../types';
+import { SITE_TYPES } from '../../types';
+import { getSiteDefinition, normalizeCustomDomain } from '../sites';
 import type { ExportPayload, RawExportPayload } from '../../types/importExport';
 import type { SemVer } from '../../types/common';
 import { EXPORT_SCHEMA_VERSION } from './constants';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const VALID_SITES: string[] = ['youtube', 'bilibili', 'other'];
+const VALID_SITES: readonly string[] = SITE_TYPES;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -122,15 +126,52 @@ function validateSettings(v: unknown): Result<Settings> {
   for (const s of v['supportedSites']) {
     const r = validateSite(s);
     if (!r.ok) return r;
+    if (r.value === 'other') return fail('"supportedSites" cannot contain "other"');
+  }
+  const siteSpeeds = Object.fromEntries(
+    SITE_TYPES.map((site) => [site, v['playbackSpeed']]),
+  ) as Record<SiteType, number>;
+  if (v['siteSpeeds'] !== undefined) {
+    if (!isRecord(v['siteSpeeds'])) return fail('"siteSpeeds" must be an object');
+    for (const site of SITE_TYPES) {
+      const speed = v['siteSpeeds'][site];
+      if (speed !== undefined) {
+        if (!isNum(speed) || speed <= 0) {
+          return fail(`"siteSpeeds.${site}" must be > 0`);
+        }
+        siteSpeeds[site] = speed;
+      }
+    }
+  }
+  const customSites: CustomSite[] = [];
+  if (v['customSites'] !== undefined) {
+    if (!Array.isArray(v['customSites'])) return fail('"customSites" must be an array');
+    const domains = new Set<string>();
+    for (const rawSite of v['customSites']) {
+      if (!isRecord(rawSite)) return fail('custom site must be an object');
+      const domain = normalizeCustomDomain(String(rawSite['domain'] ?? ''));
+      if (domain === null) return fail('custom site domain is invalid');
+      if (getSiteDefinition(domain) !== null) {
+        return fail(`custom site "${domain}" is already built in`);
+      }
+      if (domains.has(domain)) return fail(`duplicate custom site "${domain}"`);
+      if (!isNum(rawSite['speed']) || rawSite['speed'] <= 0) {
+        return fail(`custom site "${domain}" speed must be > 0`);
+      }
+      domains.add(domain);
+      customSites.push({ domain, speed: rawSite['speed'] });
+    }
   }
   return {
     ok: true,
     value: {
       extensionEnabled: v['extensionEnabled'],
       playbackSpeed: v['playbackSpeed'],
+      siteSpeeds,
+      customSites,
       overlayEnabled: v['overlayEnabled'],
       autoApply: v['autoApply'],
-      supportedSites: v['supportedSites'] as SiteType[],
+      supportedSites: v['supportedSites'] as BuiltInSiteType[],
     },
   };
 }

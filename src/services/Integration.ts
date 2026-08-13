@@ -3,6 +3,8 @@ import { ObserverService } from './ObserverService';
 import { VideoController, type PlaybackEvent } from './VideoController';
 import { StatisticsService } from './statistics';
 import type { Settings } from '../types';
+import { isHostSupported, normalizeHostname } from './sites';
+import { getHostSpeed } from './siteSettings';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -12,6 +14,11 @@ let unsubscribeStorage: (() => void) | null = null;
 let unsubscribePlayback: (() => void) | null = null;
 let latestSettings: Settings | null = null;
 let lifecycleVersion = 0;
+const currentHost = normalizeHostname(window.location.hostname);
+
+function shouldRun(settings: Settings): boolean {
+  return isHostSupported(currentHost, settings.customSites);
+}
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -59,13 +66,13 @@ function onVisibilityChange(): void {
 function onSettingsChanged(settings: Settings): void {
   latestSettings = settings;
 
-  if (!settings.extensionEnabled) {
+  if (!settings.extensionEnabled || !shouldRun(settings)) {
     disable();
     return;
   }
 
   if (running) {
-    VideoController.setSpeed(settings.playbackSpeed);
+    VideoController.setSpeed(getHostSpeed(settings, currentHost));
     return;
   }
 
@@ -112,12 +119,12 @@ async function start(): Promise<void> {
     const settings = latestSettings ?? result.value;
     latestSettings = settings;
 
-    if (!settings.extensionEnabled) {
+    if (!settings.extensionEnabled || !shouldRun(settings)) {
       VideoController.setSpeed(1);
       return;
     }
 
-    VideoController.setSpeed(settings.playbackSpeed);
+    VideoController.setSpeed(getHostSpeed(settings, currentHost));
 
     // Subscribe before the observer scans the existing DOM. Otherwise the
     // initial 'attached' events (and their statistics sessions) are lost.
@@ -130,7 +137,8 @@ async function start(): Promise<void> {
     // An enable event can arrive while a cancelled startup is unwinding.
     if (
       !running &&
-      latestSettings?.extensionEnabled === true
+      latestSettings?.extensionEnabled === true &&
+      shouldRun(latestSettings)
     ) {
       void start();
     }
