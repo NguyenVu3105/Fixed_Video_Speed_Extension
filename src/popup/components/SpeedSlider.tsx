@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import type { ReactElement, CSSProperties } from 'react';
 import { SPEED_MIN, SPEED_MAX, SPEED_STEP } from '../constants';
+import { GaugeIcon } from './icons';
 
 interface SpeedSliderProps {
   readonly speed: number;
@@ -17,14 +19,27 @@ function clamp(value: number): number {
 }
 
 export function SpeedSlider({ speed, disabled, onChange }: SpeedSliderProps): ReactElement {
-  const sliderPct = computeSliderPct(speed);
+  // Draft holds the value while the user is dragging; the parent is only
+  // notified on release (pointer up / key up / blur) so saving settings never
+  // interrupts the drag.
+  const [draft, setDraft] = useState<number | null>(null);
+  const value = draft ?? speed;
+  const sliderPct = computeSliderPct(value);
+
+  const commit = (): void => {
+    if (draft === null) return;
+    onChange(draft);
+    setDraft(null);
+  };
 
   return (
     <div className="slider-wrapper">
       <div className="row">
-        <span className="row__label-text">Playback Speed</span>
+        <span className="row__label-text">
+          <GaugeIcon size={14} /> Playback Speed
+        </span>
         <div className="speed-display">
-          <span className="speed-display__value">{speed.toFixed(2)}</span>
+          <span className="speed-display__value">{value.toFixed(2)}</span>
           <span className="speed-display__unit">x</span>
         </div>
       </div>
@@ -35,14 +50,17 @@ export function SpeedSlider({ speed, disabled, onChange }: SpeedSliderProps): Re
         min={SPEED_MIN}
         max={SPEED_MAX}
         step={SPEED_STEP}
-        value={speed}
+        value={value}
         disabled={disabled}
         aria-label="Playback speed"
         aria-valuemin={SPEED_MIN}
         aria-valuemax={SPEED_MAX}
-        aria-valuenow={speed}
+        aria-valuenow={value}
         style={{ '--slider-pct': sliderPct } as CSSProperties}
-        onChange={(e) => { onChange(clamp(e.target.valueAsNumber)); }}
+        onChange={(e) => { setDraft(clamp(e.target.valueAsNumber)); }}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={commit}
       />
       <div className="slider-labels">
         <span className="slider-labels__text">0.25x</span>

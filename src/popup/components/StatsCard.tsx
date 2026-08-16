@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { ToggleSwitch } from './ToggleSwitch';
 import { StatisticsCard } from './StatisticsCard';
 import { ActionButtons } from './ActionButtons';
+import { ChevronDownIcon, EyeIcon } from './icons';
 import type { StatisticsSummary } from '../../types';
 
 interface StatsCardProps {
@@ -40,6 +41,7 @@ export function StatsCard({
         checked={overlayEnabled}
         label="Speed Overlay"
         subLabel="Show the current speed on each video"
+        icon={<EyeIcon size={14} />}
         onChange={onToggleOverlay}
       />
       <hr className="divider" />
@@ -49,7 +51,9 @@ export function StatsCard({
             <span className="section-title">Statistics</span>
             <span className="stats-disclosure__hint">Watch time, saved time and sessions</span>
           </span>
-          <span className="stats-disclosure__chevron" aria-hidden="true">⌄</span>
+          <span className="stats-disclosure__chevron" aria-hidden="true">
+            <ChevronDownIcon size={14} />
+          </span>
         </summary>
         <div className="stats-disclosure__content">
           <StatisticsCard today={summary?.today ?? null} allTime={summary?.total ?? null} />

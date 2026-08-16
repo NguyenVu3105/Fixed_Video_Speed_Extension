@@ -12,6 +12,7 @@ export interface CurrentSite {
   readonly label: string;
   readonly supported: boolean;
   readonly custom: boolean;
+  readonly favIconUrl: string | null;
 }
 
 /** Reads the active tab without making the popup depend on page-side code. */
@@ -32,6 +33,7 @@ export async function getCurrentSite(settings: Settings): Promise<CurrentSite | 
       label: customSite === null ? getSiteLabel(site) : 'Custom site',
       supported: isHostSupported(parsed.hostname, settings.customSites),
       custom: customSite !== null && site === 'other',
+      favIconUrl: tabs[0]?.favIconUrl ?? null,
     };
   } catch {
     // The popup should still be usable if the browser withholds tab metadata.

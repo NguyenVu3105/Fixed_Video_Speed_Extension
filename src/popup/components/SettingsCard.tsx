@@ -4,6 +4,7 @@ import { ToggleSwitch } from "./ToggleSwitch";
 import { SpeedSlider } from "./SpeedSlider";
 import { QuickSpeedButtons } from "./QuickSpeedButtons";
 import { CurrentSiteIndicator } from "./CurrentSiteIndicator";
+import { PowerIcon } from "./icons";
 import type { CurrentSite } from "../utils/currentSite";
 import { getSiteSpeed } from "../../services/siteSettings";
 
@@ -31,6 +32,7 @@ export function SettingsCard({
       : getSiteSpeed(settings, currentSite.site, currentSite.hostname);
   const siteSpeedAvailable =
     currentSite?.supported === true && !currentSiteLoading;
+  const panelOpen = extensionEnabled && siteSpeedAvailable;
 
   return (
     <div className="card card-section">
@@ -45,10 +47,14 @@ export function SettingsCard({
         checked={extensionEnabled}
         label="Enable Extension"
         subLabel="Apply the saved speed for this site"
+        icon={<PowerIcon size={14} />}
         onChange={onToggleEnabled}
       />
-      {extensionEnabled && siteSpeedAvailable && (
-        <>
+      <div
+        className={`speed-panel${panelOpen ? ' speed-panel--open' : ''}`}
+        aria-hidden={!panelOpen}
+      >
+        <div className="speed-panel__inner">
           <hr className="divider" />
           <SpeedSlider
             speed={siteSpeed}
@@ -60,9 +66,8 @@ export function SettingsCard({
             disabled={false}
             onSelect={onSpeedChange}
           />
-        </>
-      )}
-      {!extensionEnabled}
+        </div>
+      </div>
       {extensionEnabled &&
         !currentSiteLoading &&
         currentSite !== null &&

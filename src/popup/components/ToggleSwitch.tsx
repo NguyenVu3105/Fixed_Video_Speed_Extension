@@ -5,14 +5,18 @@ interface ToggleSwitchProps {
   readonly checked: boolean;
   readonly label: string;
   readonly subLabel?: string;
+  readonly icon?: ReactElement;
   readonly onChange: (checked: boolean) => void;
 }
 
-export function ToggleSwitch({ id, checked, label, subLabel, onChange }: ToggleSwitchProps): ReactElement {
+export function ToggleSwitch({ id, checked, label, subLabel, icon, onChange }: ToggleSwitchProps): ReactElement {
   return (
     <div className="row">
       <div className="row__label">
-        <span className="row__label-text">{label}</span>
+        <span className="row__label-text">
+          {icon}
+          {label}
+        </span>
         {subLabel !== undefined && (
           <span className="row__label-sub">{subLabel}</span>
         )}

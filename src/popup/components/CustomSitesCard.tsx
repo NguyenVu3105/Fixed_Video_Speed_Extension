@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 import type { CustomSite } from '../../types';
 import { SPEED_MAX, SPEED_MIN, SPEED_STEP } from '../constants';
+import { GlobeIcon, XIcon } from './icons';
 
 interface CustomSitesCardProps {
   readonly sites: readonly CustomSite[];
@@ -32,7 +33,9 @@ export function CustomSitesCard({
   return (
     <div className="card card-section custom-sites-card">
       <div>
-        <span className="section-title">Custom websites</span>
+        <span className="section-title">
+          <GlobeIcon size={12} /> Custom websites
+        </span>
         <p className="custom-sites__hint">Add a domain to apply a fixed speed to its videos.</p>
       </div>
       <form className="custom-site-form" onSubmit={submit}>
@@ -76,7 +79,7 @@ export function CustomSitesCard({
                 aria-label={`Remove ${site.domain}`}
                 onClick={() => { onRemove(site.domain); }}
               >
-                ×
+                <XIcon size={14} />
               </button>
             </div>
           ))}

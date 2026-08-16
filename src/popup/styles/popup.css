@@ -36,6 +36,7 @@
 
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --popup-width: 380px;
+  --popup-height: 600px;
 }
 
 /* ─── Reset & Base ──────────────────────────────────────────────────────────── */
@@ -64,10 +65,14 @@ body {
   width: var(--popup-width);
   max-width: var(--popup-width);
   min-width: var(--popup-width);
-  min-height: 100px;
-  max-height: 600px;
+  /* Fixed height so the popup does not grow/shrink when content changes
+     (e.g. toggling the extension shows/hides the speed controls). */
+  height: var(--popup-height);
   overflow-x: hidden;
   overflow-y: auto;
+  /* Reserve the scrollbar lane so content width stays constant whether or
+     not the content overflows. */
+  scrollbar-gutter: stable;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -150,10 +155,30 @@ body {
   gap: 12px;
 }
 
+.current-site__favicon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-dim);
+  overflow: hidden;
+}
+
+.current-site__favicon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
 .current-site__copy {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  flex: 1;
   min-width: 0;
 }
 
@@ -252,6 +277,9 @@ body {
 }
 
 .row__label-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
@@ -446,6 +474,31 @@ body {
   margin: 0;
 }
 
+/* ─── Speed Panel (expand/collapse) ─────────────────────────────────────────── */
+/* The panel stays mounted so the slider/quick buttons can animate in and out
+   instead of popping when the extension toggle flips. */
+.speed-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--transition-smooth),
+    opacity var(--transition-base);
+}
+
+.speed-panel--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.speed-panel__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .settings-hint {
   color: var(--color-text-muted);
   font-size: 12px;
@@ -479,8 +532,9 @@ body {
 }
 
 .stat-item__icon {
+  display: inline-flex;
+  align-items: center;
   color: var(--color-primary);
-  font-size: 15px;
   line-height: 1;
 }
 
@@ -584,7 +638,6 @@ body {
   border: 1px solid var(--color-border);
   border-radius: 50%;
   color: var(--color-text-muted);
-  font-size: 16px;
   transition: transform var(--transition-base), color var(--transition-base);
 }
 
@@ -641,6 +694,9 @@ body {
 
 /* ─── Section Label ──────────────────────────────────────────────────────────── */
 .section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 10px;
   font-weight: 700;
   color: var(--color-text-dim);
@@ -737,14 +793,14 @@ body {
 }
 
 .custom-site-row__remove {
+  display: grid;
+  place-items: center;
   width: 24px;
   height: 24px;
   border: 0;
   background: transparent;
   color: var(--color-text-dim);
   cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
 }
 
 .custom-site-row__remove:hover {

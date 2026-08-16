@@ -1,11 +1,12 @@
 import type { ReactElement } from 'react';
 import type { PeriodStats } from '../../types';
 import { formatDuration } from '../utils/formatters';
+import { ClockIcon, ZapIcon, BarChartIcon } from './icons';
 
 const PLACEHOLDER = '—';
 
 interface StatItemProps {
-  readonly icon: string;
+  readonly icon: ReactElement;
   readonly label: string;
   readonly value: string;
   readonly highlight?: boolean;
@@ -41,15 +42,15 @@ export function StatisticsCard({ today, allTime }: StatisticsCardProps): ReactEl
     <div>
       <span className="stats-group-title">Today</span>
       <div className="stats-grid">
-        <StatItem icon="◷" label="Watched" value={watched(today)} />
-        <StatItem icon="↯" label="Saved" value={saved(today)} highlight />
-        <StatItem icon="▣" label="Sessions" value={sessions(today)} full />
+        <StatItem icon={<ClockIcon size={14} />} label="Watched" value={watched(today)} />
+        <StatItem icon={<ZapIcon size={14} />} label="Saved" value={saved(today)} highlight />
+        <StatItem icon={<BarChartIcon size={14} />} label="Sessions" value={sessions(today)} full />
       </div>
       <span className="stats-group-title stats-group-title--spaced">All time</span>
       <div className="stats-grid">
-        <StatItem icon="◷" label="Watched" value={watched(allTime)} />
-        <StatItem icon="↯" label="Saved" value={saved(allTime)} highlight />
-        <StatItem icon="▣" label="Sessions" value={sessions(allTime)} full />
+        <StatItem icon={<ClockIcon size={14} />} label="Watched" value={watched(allTime)} />
+        <StatItem icon={<ZapIcon size={14} />} label="Saved" value={saved(allTime)} highlight />
+        <StatItem icon={<BarChartIcon size={14} />} label="Sessions" value={sessions(allTime)} full />
       </div>
     </div>
   );

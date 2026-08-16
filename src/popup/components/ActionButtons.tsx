@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { DownloadIcon, UploadIcon, RotateCcwIcon } from './icons';
 
 interface ActionButtonsProps {
   readonly exporting: boolean;
@@ -34,7 +35,7 @@ export function ActionButtons({
           disabled={exporting || importing}
           onClick={onImportReplace}
         >
-          {importing ? 'Importing…' : 'Replace'}
+          {importing ? 'Importing…' : (<><UploadIcon size={12} /> Replace</>)}
         </button>
         <button
           id="btn-import-merge"
@@ -44,7 +45,7 @@ export function ActionButtons({
           disabled={exporting || importing}
           onClick={onImportMerge}
         >
-          {importing ? 'Importing…' : 'Merge'}
+          {importing ? 'Importing…' : (<><UploadIcon size={12} /> Merge</>)}
         </button>
         <button
           id="btn-export"
@@ -54,7 +55,7 @@ export function ActionButtons({
           disabled={exporting || importing}
           onClick={onExport}
         >
-          {exporting ? 'Exporting…' : 'Export'}
+          {exporting ? 'Exporting…' : (<><DownloadIcon size={12} /> Export</>)}
         </button>
         <button
           id="btn-reset"
@@ -64,7 +65,7 @@ export function ActionButtons({
           disabled={exporting || importing || resetting}
           onClick={onReset}
         >
-          {resetting ? 'Resetting…' : 'Reset'}
+          {resetting ? 'Resetting…' : (<><RotateCcwIcon size={12} /> Reset</>)}
         </button>
       </div>
       {statusMessage !== null && (
