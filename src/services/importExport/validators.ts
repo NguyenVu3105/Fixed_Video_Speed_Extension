@@ -7,13 +7,15 @@ import type {
   CustomSite,
   BuiltInSiteType,
   SiteType,
+  SpeedProfile,
   Result,
 } from '../../types';
 import { SITE_TYPES } from '../../types';
 import { getSiteDefinition, normalizeCustomDomain } from '../sites';
+import { DEFAULT_PROFILES } from '../StorageService';
 import type { ExportPayload, RawExportPayload } from '../../types/importExport';
 import type { SemVer } from '../../types/common';
-import { EXPORT_SCHEMA_VERSION } from './constants';
+import { SUPPORTED_EXPORT_SCHEMA_VERSIONS } from './constants';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -143,6 +145,41 @@ function validateSettings(v: unknown): Result<Settings> {
       }
     }
   }
+  // Profiles are optional for backward compatibility with v1 exports.
+  const profiles: SpeedProfile[] = [];
+  if (v['profiles'] !== undefined) {
+    if (!Array.isArray(v['profiles'])) return fail('"profiles" must be an array');
+    const ids = new Set<string>();
+    for (const rawProfile of v['profiles']) {
+      if (!isRecord(rawProfile)) return fail('profile must be an object');
+      const id = typeof rawProfile['id'] === 'string' ? rawProfile['id'].trim() : '';
+      const name = typeof rawProfile['name'] === 'string' ? rawProfile['name'].trim() : '';
+      if (id === '') return fail('profile "id" must be a non-empty string');
+      if (name === '') return fail(`profile "${id}" name must be a non-empty string`);
+      if (!isNum(rawProfile['speed']) || rawProfile['speed'] <= 0) {
+        return fail(`profile "${id}" speed must be > 0`);
+      }
+      if (ids.has(id)) return fail(`duplicate profile "${id}"`);
+      ids.add(id);
+      profiles.push({ id, name, speed: rawProfile['speed'] });
+    }
+  }
+  const effectiveProfiles = profiles.length > 0 ? profiles : [...DEFAULT_PROFILES];
+  const validProfileIds = new Set(effectiveProfiles.map((p) => p.id));
+
+  const siteProfiles: Partial<Record<SiteType, string>> = {};
+  if (v['siteProfiles'] !== undefined) {
+    if (!isRecord(v['siteProfiles'])) return fail('"siteProfiles" must be an object');
+    for (const site of SITE_TYPES) {
+      const id = v['siteProfiles'][site];
+      if (id === undefined) continue;
+      if (typeof id !== 'string' || !validProfileIds.has(id)) {
+        return fail(`"siteProfiles.${site}" references an unknown profile`);
+      }
+      siteProfiles[site] = id;
+    }
+  }
+
   const customSites: CustomSite[] = [];
   if (v['customSites'] !== undefined) {
     if (!Array.isArray(v['customSites'])) return fail('"customSites" must be an array');
@@ -158,8 +195,13 @@ function validateSettings(v: unknown): Result<Settings> {
       if (!isNum(rawSite['speed']) || rawSite['speed'] <= 0) {
         return fail(`custom site "${domain}" speed must be > 0`);
       }
+      const profileId =
+        typeof rawSite['profileId'] === 'string' &&
+        validProfileIds.has(rawSite['profileId'])
+          ? rawSite['profileId']
+          : null;
       domains.add(domain);
-      customSites.push({ domain, speed: rawSite['speed'] });
+      customSites.push({ domain, speed: rawSite['speed'], profileId });
     }
   }
   return {
@@ -172,6 +214,8 @@ function validateSettings(v: unknown): Result<Settings> {
       overlayEnabled: v['overlayEnabled'],
       autoApply: v['autoApply'],
       supportedSites: v['supportedSites'] as BuiltInSiteType[],
+      profiles: effectiveProfiles,
+      siteProfiles,
     },
   };
 }
@@ -201,11 +245,11 @@ function validateStatistics(v: unknown): Result<Statistics> {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/** Validates a version string against the supported export schema version. */
+/** Validates a version string against the supported export schema versions. */
 export function validateVersion(v: unknown): Result<SemVer> {
   if (typeof v !== 'string' || v.length === 0) return fail('"version" must be a string');
-  if (v !== EXPORT_SCHEMA_VERSION) {
-    return fail(`unsupported export schema version "${v}" (expected "${EXPORT_SCHEMA_VERSION}")`);
+  if (!SUPPORTED_EXPORT_SCHEMA_VERSIONS.includes(v as (typeof SUPPORTED_EXPORT_SCHEMA_VERSIONS)[number])) {
+    return fail(`unsupported export schema version "${v}" (supported: ${SUPPORTED_EXPORT_SCHEMA_VERSIONS.join(', ')})`);
   }
   return { ok: true, value: v as SemVer };
 }

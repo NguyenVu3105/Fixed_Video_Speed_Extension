@@ -5,6 +5,7 @@ export type {
   Settings,
   DefaultSettings,
   SiteSpeeds,
+  SpeedProfile,
 } from './settings';
 export type { ExportPayload, ImportMode } from './importExport';
 export type {

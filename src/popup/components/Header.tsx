@@ -3,27 +3,25 @@ import { EXTENSION_NAME, EXTENSION_VERSION } from '../constants';
 
 interface HeaderProps {
   readonly enabled?: boolean;
-  readonly supported?: boolean;
 }
 
-export function Header({ enabled = true, supported = true }: HeaderProps): ReactElement {
-  const status = !enabled ? 'Off' : supported ? 'Active' : 'Ready';
-
+export function Header({ enabled = true }: HeaderProps): ReactElement {
   return (
-    <header className="header">
+    <header className="app-header">
       <img
-        className="header__logo"
+        className="app-header__logo"
         src="../icons/icon48.png"
         alt=""
         width="48"
         height="48"
       />
-      <div className="header__info">
-        <span className="header__title">{EXTENSION_NAME}</span>
-        <span className="header__version">v{EXTENSION_VERSION}</span>
+      <div className="app-header__info">
+        <span className="app-header__title">{EXTENSION_NAME}</span>
+        <span className="app-header__version">v{EXTENSION_VERSION}</span>
       </div>
-      <span className={`header__badge${!enabled ? ' header__badge--off' : ''}`}>
-        {status}
+      <span className={`app-header__badge${enabled ? ' app-header__badge--active' : ''}`}>
+        <span className="app-header__badge-dot" aria-hidden="true" />
+        {enabled ? 'Active' : 'Off'}
       </span>
     </header>
   );

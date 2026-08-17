@@ -71,11 +71,7 @@ export function ActionButtons({
       {statusMessage !== null && (
         <p
           role={statusError ? 'alert' : 'status'}
-          style={{
-            marginTop: '6px',
-            fontSize: '11px',
-            color: statusError ? '#f87171' : '#34d399',
-          }}
+          className={`status-message${statusError ? ' status-message--error' : ' status-message--ok'}`}
         >
           {statusMessage}
         </p>

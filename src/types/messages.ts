@@ -1,0 +1,31 @@
+// ─── Popup ↔ Content Script Messages ─────────────────────────────────────────
+// Sent from the popup via chrome.tabs.sendMessage; handled by the content
+// script's Integration runtime. Prefixed to avoid collisions with page code.
+
+/** Requests the runtime state of the content script in the target tab. */
+export interface GetStateMessage {
+  type: 'fvs:get-state';
+}
+
+/** Runtime state reported back by the content script. */
+export interface ContentState {
+  /** Number of video elements currently attached by the extension. */
+  videoCount: number;
+  /** Whether speed enforcement is actively running. */
+  running: boolean;
+  /** Current global target playback speed. */
+  speed: number;
+}
+
+/** Temporarily shows the speed overlay on the target tab as a preview. */
+export interface PreviewMessage {
+  type: 'fvs:preview';
+}
+
+/** Applies a speed to the target tab immediately (without saving). */
+export interface ApplyMessage {
+  type: 'fvs:apply';
+  speed: number;
+}
+
+export type PopupToContentMessage = GetStateMessage | PreviewMessage | ApplyMessage;

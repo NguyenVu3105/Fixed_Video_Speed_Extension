@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactElement } from "react";
-import type { Settings, Result, ImportMode, StatisticsSummary } from "../types";
+import type { Settings, Result, ImportMode, SiteType, StatisticsSummary } from "../types";
 import { DEFAULT_SETTINGS, StorageService } from "../services/StorageService";
 import {
   exportData,
@@ -10,26 +10,34 @@ import {
 import { StatisticsService } from "../services/statistics";
 import { formatDuration } from "./utils/formatters";
 import { Header } from "./components/Header";
-import { SettingsCard } from "./components/SettingsCard";
-import { StatsCard } from "./components/StatsCard";
-import { CustomSitesCard } from "./components/CustomSitesCard";
+import { BottomNav } from "./components/BottomNav";
+import type { TabId } from "./components/BottomNav";
+import { DashboardTab } from "./components/DashboardTab";
+import { SitesPage } from "./components/SitesPage";
+import { StatisticsPage } from "./components/StatisticsPage";
+import { SettingsPage } from "./components/SettingsPage";
+import { DataPage } from "./components/DataPage";
 import type { CurrentSite } from "./utils/currentSite";
 import { getCurrentSite } from "./utils/currentSite";
 import { findCustomSite, getSiteDefinition, normalizeCustomDomain } from "../services/sites";
+import { findProfile, getSiteSpeed } from "../services/siteSettings";
+import { useContentState } from "./hooks/useContentState";
 
 // ─── Loading State ────────────────────────────────────────────────────────────
 
 function LoadingView(): ReactElement {
   return (
-    <div className="popup-wrapper">
+    <div className="app">
       <Header />
-      <div
-        className="card card-section loading-state"
-        aria-busy="true"
-        aria-label="Loading settings"
-      >
-        <span className="loading-state__text">Loading…</span>
-      </div>
+      <main className="app__content">
+        <div
+          className="card card-section loading-state"
+          aria-busy="true"
+          aria-label="Loading settings"
+        >
+          <span className="loading-state__text">Loading…</span>
+        </div>
+      </main>
     </div>
   );
 }
@@ -41,6 +49,9 @@ export function App(): ReactElement {
   const [currentSite, setCurrentSite] = useState<CurrentSite | null>(null);
   const [currentSiteLoading, setCurrentSiteLoading] = useState(true);
   const [summary, setSummary] = useState<StatisticsSummary | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("dashboard");
+  const [speed, setSpeed] = useState(1);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -51,6 +62,7 @@ export function App(): ReactElement {
   const exportingRef = useRef(false);
   const importingRef = useRef(false);
   const resettingRef = useRef(false);
+  const { state: contentState } = useContentState();
 
   // ── Load + subscribe ──────────────────────────────────────────────────────
 
@@ -110,6 +122,26 @@ export function App(): ReactElement {
     };
   }, [settings]);
 
+  // ── Current speed display (mirrors the saved speed for the current site) ──
+
+  useEffect(() => {
+    if (settings === null || currentSiteLoading) return;
+    if (currentSite === null || currentSite.supported !== true) return;
+    const siteSpeed = getSiteSpeed(settings, currentSite.site, currentSite.hostname);
+    setSpeed(siteSpeed);
+    // Reflect the stored profile assignment; a raw speed matching a profile
+    // is shown as that profile in the dropdown.
+    const assignedId = currentSite.custom
+      ? findCustomSite(currentSite.hostname, settings.customSites)?.profileId ?? null
+      : settings.siteProfiles[currentSite.site] ?? null;
+    if (assignedId !== null) {
+      setSelectedProfileId(assignedId);
+      return;
+    }
+    const matching = settings.profiles.find((p) => p.speed === siteSpeed);
+    setSelectedProfileId(matching !== undefined ? matching.id : null);
+  }, [settings, currentSite, currentSiteLoading]);
+
   // ── Save helper (deduplicates unchanged fields) ───────────────────────────
 
   const save = useCallback((patch: Partial<Settings>) => {
@@ -147,35 +179,94 @@ export function App(): ReactElement {
     [save],
   );
 
-  const handleSpeedChange = useCallback(
-    (speed: number) => {
-      if (currentSite?.supported !== true || settings === null) return;
-      if (currentSite.custom) {
-        const customSite = findCustomSite(currentSite.hostname, settings.customSites);
-        if (customSite === null || customSite.speed === speed) return;
-        save({
-          customSites: settings.customSites.map((site) =>
-            site.domain === customSite.domain ? { ...site, speed } : site,
-          ),
-        });
-        return;
-      }
-      if (settings.siteSpeeds[currentSite.site] === speed) return;
-      save({
-        siteSpeeds: {
-          ...settings.siteSpeeds,
-          [currentSite.site]: speed,
-        },
-      });
-    },
-    [currentSite, save, settings],
-  );
-
   const handleToggleOverlay = useCallback(
     (enabled: boolean) => {
       save({ overlayEnabled: enabled });
     },
     [save],
+  );
+
+  /**
+   * Persists a new speed for the current site immediately. The content script
+   * picks the change up through its storage subscription — no apply step.
+   */
+  const handleSpeedChange = useCallback(
+    (nextSpeed: number) => {
+      if (settings === null || currentSite === null) return;
+      if (currentSite.supported !== true) return;
+      setSpeed(nextSpeed);
+
+      // Keep the profile dropdown in sync: a speed matching a profile selects
+      // it; anything else falls back to "Custom".
+      const matching = settings.profiles.find((p) => p.speed === nextSpeed);
+      const assignId = matching !== undefined ? matching.id : null;
+      setSelectedProfileId(assignId);
+
+      if (currentSite.custom) {
+        const customSite = findCustomSite(currentSite.hostname, settings.customSites);
+        if (customSite === null) return;
+        if (customSite.speed === nextSpeed && (customSite.profileId ?? null) === assignId) return;
+        save({
+          customSites: settings.customSites.map((site) =>
+            site.domain === customSite.domain
+              ? { ...site, speed: nextSpeed, profileId: assignId }
+              : site,
+          ),
+        });
+        return;
+      }
+      const previousAssign = settings.siteProfiles[currentSite.site] ?? null;
+      if (settings.siteSpeeds[currentSite.site] === nextSpeed && previousAssign === assignId) return;
+      const siteProfiles = { ...settings.siteProfiles };
+      if (assignId === null) {
+        delete siteProfiles[currentSite.site];
+      } else {
+        siteProfiles[currentSite.site] = assignId;
+      }
+      save({
+        siteSpeeds: {
+          ...settings.siteSpeeds,
+          [currentSite.site]: nextSpeed,
+        },
+        siteProfiles,
+      });
+    },
+    [currentSite, save, settings],
+  );
+
+  const handleSelectProfile = useCallback(
+    (profileId: string | null) => {
+      setSelectedProfileId(profileId);
+      if (settings === null || profileId === null) return;
+      const profile = findProfile(settings.profiles, profileId);
+      if (profile !== null) handleSpeedChange(profile.speed);
+    },
+    [handleSpeedChange, settings],
+  );
+
+  const handleSiteSpeedChange = useCallback(
+    (site: SiteType, speed: number) => {
+      if (settings === null) return;
+      if (settings.siteSpeeds[site] === speed) return;
+      save({
+        siteSpeeds: { ...settings.siteSpeeds, [site]: speed },
+      });
+    },
+    [save, settings],
+  );
+
+  /** Resets a built-in site to 1x and drops its profile assignment. */
+  const handleClearSiteSpeed = useCallback(
+    (site: SiteType) => {
+      if (settings === null) return;
+      const siteProfiles = { ...settings.siteProfiles };
+      delete siteProfiles[site];
+      save({
+        siteSpeeds: { ...settings.siteSpeeds, [site]: 1 },
+        siteProfiles,
+      });
+    },
+    [save, settings],
   );
 
   // ── Import/Export Handlers ────────────────────────────────────────────────
@@ -201,7 +292,7 @@ export function App(): ReactElement {
         showStatus("This domain is already in your custom sites.", true);
         return;
       }
-      save({ customSites: [...settings.customSites, { domain, speed: 1 }] });
+      save({ customSites: [...settings.customSites, { domain, speed: 1, profileId: null }] });
       showStatus(`${domain} added.`, false);
     },
     [save, settings, showStatus],
@@ -226,6 +317,58 @@ export function App(): ReactElement {
       showStatus(`${domain} removed.`, false);
     },
     [save, settings, showStatus],
+  );
+
+  // ── Profile management ────────────────────────────────────────────────────
+
+  const handleAddProfile = useCallback(() => {
+    if (settings === null) return;
+    const profile = {
+      id: crypto.randomUUID(),
+      name: `Profile ${String(settings.profiles.length + 1)}`,
+      speed: 1,
+    };
+    save({ profiles: [...settings.profiles, profile] });
+  }, [save, settings]);
+
+  const handleRenameProfile = useCallback(
+    (id: string, name: string) => {
+      if (settings === null) return;
+      save({
+        profiles: settings.profiles.map((p) => (p.id === id ? { ...p, name } : p)),
+      });
+    },
+    [save, settings],
+  );
+
+  const handleProfileSpeedChange = useCallback(
+    (id: string, speed: number) => {
+      if (settings === null) return;
+      save({
+        profiles: settings.profiles.map((p) => (p.id === id ? { ...p, speed } : p)),
+      });
+    },
+    [save, settings],
+  );
+
+  const handleRemoveProfile = useCallback(
+    (id: string) => {
+      if (settings === null) return;
+      // Strip every reference to the deleted profile in the same patch.
+      const siteProfiles = { ...settings.siteProfiles };
+      for (const [site, profileId] of Object.entries(siteProfiles)) {
+        if (profileId === id) delete siteProfiles[site as SiteType];
+      }
+      save({
+        profiles: settings.profiles.filter((p) => p.id !== id),
+        siteProfiles,
+        customSites: settings.customSites.map((site) =>
+          site.profileId === id ? { ...site, profileId: null } : site,
+        ),
+      });
+      if (selectedProfileId === id) setSelectedProfileId(null);
+    },
+    [save, selectedProfileId, settings],
   );
 
   const handleExport = useCallback(async () => {
@@ -332,43 +475,62 @@ export function App(): ReactElement {
   }
 
   return (
-    <div className="popup-wrapper">
-      <Header
-        enabled={settings.extensionEnabled}
-        supported={currentSiteLoading || currentSite?.supported === true}
-      />
-      <SettingsCard
-        settings={settings}
-        onToggleEnabled={handleToggleEnabled}
-        onSpeedChange={handleSpeedChange}
-        currentSite={currentSite}
-        currentSiteLoading={currentSiteLoading}
-        onAddDomain={handleAddCustomSite}
-      />
-      <CustomSitesCard
-        sites={settings.customSites}
-        onAdd={handleAddCustomSite}
-        onChangeSpeed={handleCustomSiteSpeedChange}
-        onRemove={handleRemoveCustomSite}
-      />
-      <StatsCard
-        summary={summary}
-        overlayEnabled={settings.overlayEnabled}
-        onToggleOverlay={handleToggleOverlay}
-        exporting={exporting}
-        importing={importing}
-        resetting={resetting}
-        statusMessage={statusMessage}
-        statusError={statusError}
-        onExport={() => {
-          void handleExport();
-        }}
-        onImportReplace={handleImportReplace}
-        onImportMerge={handleImportMerge}
-        onReset={() => {
-          void handleReset();
-        }}
-      />
+    <div className="app">
+      <Header enabled={settings.extensionEnabled} />
+      <main className="app__content">
+        {activeTab === "dashboard" && (
+          <DashboardTab
+            settings={settings}
+            currentSite={currentSite}
+            currentSiteLoading={currentSiteLoading}
+            contentState={contentState}
+            speed={speed}
+            selectedProfileId={selectedProfileId}
+            summary={summary}
+            onSpeedChange={handleSpeedChange}
+            onSelectProfile={handleSelectProfile}
+            onAddDomain={handleAddCustomSite}
+          />
+        )}
+        {activeTab === "sites" && (
+          <SitesPage
+            settings={settings}
+            onChangeSiteSpeed={handleSiteSpeedChange}
+            onClearSiteSpeed={handleClearSiteSpeed}
+            onAddCustomSite={handleAddCustomSite}
+            onChangeCustomSpeed={handleCustomSiteSpeedChange}
+            onRemoveCustomSite={handleRemoveCustomSite}
+          />
+        )}
+        {activeTab === "statistics" && <StatisticsPage summary={summary} />}
+        {activeTab === "settings" && (
+          <SettingsPage
+            settings={settings}
+            resetting={resetting}
+            onToggleEnabled={handleToggleEnabled}
+            onToggleOverlay={handleToggleOverlay}
+            onAddProfile={handleAddProfile}
+            onRenameProfile={handleRenameProfile}
+            onChangeProfileSpeed={handleProfileSpeedChange}
+            onRemoveProfile={handleRemoveProfile}
+            onReset={() => { void handleReset(); }}
+          />
+        )}
+        {activeTab === "data" && (
+          <DataPage
+            exporting={exporting}
+            importing={importing}
+            resetting={resetting}
+            statusMessage={statusMessage}
+            statusError={statusError}
+            onExport={() => { void handleExport(); }}
+            onImportReplace={handleImportReplace}
+            onImportMerge={handleImportMerge}
+            onReset={() => { void handleReset(); }}
+          />
+        )}
+      </main>
+      <BottomNav active={activeTab} onChange={setActiveTab} />
       <input
         ref={fileInputRef}
         type="file"

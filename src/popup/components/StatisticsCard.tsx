@@ -27,10 +27,11 @@ function StatItem({ icon, label, value, highlight = false, full = false }: StatI
 
 interface StatisticsCardProps {
   readonly today: PeriodStats | null;
+  readonly week: PeriodStats | null;
   readonly allTime: PeriodStats | null;
 }
 
-export function StatisticsCard({ today, allTime }: StatisticsCardProps): ReactElement {
+export function StatisticsCard({ today, week, allTime }: StatisticsCardProps): ReactElement {
   const watched = (p: PeriodStats | null): string =>
     p === null ? PLACEHOLDER : formatDuration(p.watchedSeconds);
   const saved = (p: PeriodStats | null): string =>
@@ -38,20 +39,24 @@ export function StatisticsCard({ today, allTime }: StatisticsCardProps): ReactEl
   const sessions = (p: PeriodStats | null): string =>
     p === null ? PLACEHOLDER : String(p.sessionCount);
 
+  const group = (title: string, period: PeriodStats | null, spaced: boolean): ReactElement => (
+    <div key={title}>
+      <span className={`stats-group-title${spaced ? ' stats-group-title--spaced' : ''}`}>
+        {title}
+      </span>
+      <div className="stats-grid">
+        <StatItem icon={<ClockIcon size={14} />} label="Watched" value={watched(period)} />
+        <StatItem icon={<ZapIcon size={14} />} label="Saved" value={saved(period)} highlight />
+        <StatItem icon={<BarChartIcon size={14} />} label="Sessions" value={sessions(period)} full />
+      </div>
+    </div>
+  );
+
   return (
     <div>
-      <span className="stats-group-title">Today</span>
-      <div className="stats-grid">
-        <StatItem icon={<ClockIcon size={14} />} label="Watched" value={watched(today)} />
-        <StatItem icon={<ZapIcon size={14} />} label="Saved" value={saved(today)} highlight />
-        <StatItem icon={<BarChartIcon size={14} />} label="Sessions" value={sessions(today)} full />
-      </div>
-      <span className="stats-group-title stats-group-title--spaced">All time</span>
-      <div className="stats-grid">
-        <StatItem icon={<ClockIcon size={14} />} label="Watched" value={watched(allTime)} />
-        <StatItem icon={<ZapIcon size={14} />} label="Saved" value={saved(allTime)} highlight />
-        <StatItem icon={<BarChartIcon size={14} />} label="Sessions" value={sessions(allTime)} full />
-      </div>
+      {group('Today', today, false)}
+      {group('This week', week, true)}
+      {group('All time', allTime, true)}
     </div>
   );
 }

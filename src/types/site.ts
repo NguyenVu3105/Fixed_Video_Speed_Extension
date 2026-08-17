@@ -3,15 +3,11 @@ export type BuiltInSiteType =
   | "youtube"
   | "bilibili"
   | "tiktok"
-  | "vimeo"
   | "twitch"
   | "netflix"
   | "disney-plus"
-  | "prime-video"
   | "coursera"
   | "udemy"
-  | "edx"
-  | "khan-academy"
   | "facebook"
   | "x"
   | "reddit"
@@ -25,15 +21,11 @@ export const SITE_TYPES = [
   "youtube",
   "bilibili",
   "tiktok",
-  "vimeo",
   "twitch",
   "netflix",
   "disney-plus",
-  "prime-video",
   "coursera",
   "udemy",
-  "edx",
-  "khan-academy",
   "facebook",
   "x",
   "reddit",

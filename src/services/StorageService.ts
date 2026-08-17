@@ -4,6 +4,7 @@ import type {
   SiteType,
   Settings,
   SettingsChangeCallback,
+  SpeedProfile,
   Statistics,
   StatisticsChangeCallback,
   Result,
@@ -13,6 +14,13 @@ import { SITE_TYPES, SUPPORTED_SITE_TYPES } from '../types';
 import { getSiteDefinition, normalizeCustomDomain } from './sites';
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
+
+/** Seed profiles created on first install and when migrating older settings. */
+export const DEFAULT_PROFILES: readonly SpeedProfile[] = [
+  { id: 'normal', name: 'Normal', speed: 1 },
+  { id: 'fast', name: 'Fast', speed: 1.5 },
+  { id: 'turbo', name: 'Turbo', speed: 2 },
+];
 
 export const DEFAULT_SETTINGS: Settings = {
   extensionEnabled: true,
@@ -24,6 +32,8 @@ export const DEFAULT_SETTINGS: Settings = {
   overlayEnabled: true,
   autoApply: true,
   supportedSites: [...SUPPORTED_SITE_TYPES],
+  profiles: [...DEFAULT_PROFILES],
+  siteProfiles: {},
 };
 
 const DEFAULT_STATISTICS: Statistics = {
@@ -52,10 +62,50 @@ function isSiteType(value: unknown): value is SiteType {
   return typeof value === 'string' && SITE_TYPES.includes(value as SiteType);
 }
 
-function normalizeCustomSites(value: unknown): CustomSite[] {
+function normalizeProfiles(value: unknown): SpeedProfile[] {
+  if (!Array.isArray(value)) return [...DEFAULT_PROFILES];
+  const normalized: SpeedProfile[] = [];
+  const seen = new Set<string>();
+
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const id = typeof item['id'] === 'string' ? item['id'].trim() : '';
+    const name = typeof item['name'] === 'string' ? item['name'].trim() : '';
+    const speed = item['speed'];
+    if (id === '' || name === '' || !isValidSpeed(speed) || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    normalized.push({ id, name, speed });
+  }
+  // An empty profile list would leave the dashboard dropdown useless.
+  return normalized.length > 0 ? normalized : [...DEFAULT_PROFILES];
+}
+
+function normalizeSiteProfiles(
+  value: unknown,
+  profiles: readonly SpeedProfile[],
+): Partial<Record<SiteType, string>> {
+  if (!isRecord(value)) return {};
+  const validIds = new Set(profiles.map((p) => p.id));
+  const normalized: Partial<Record<SiteType, string>> = {};
+  for (const site of SITE_TYPES) {
+    const id = value[site];
+    if (typeof id === 'string' && validIds.has(id)) {
+      normalized[site] = id;
+    }
+  }
+  return normalized;
+}
+
+function normalizeCustomSites(
+  value: unknown,
+  profiles: readonly SpeedProfile[],
+): CustomSite[] {
   if (!Array.isArray(value)) return [];
   const normalized: CustomSite[] = [];
   const seen = new Set<string>();
+  const validIds = new Set(profiles.map((p) => p.id));
 
   for (const item of value) {
     if (!isRecord(item)) continue;
@@ -70,7 +120,11 @@ function normalizeCustomSites(value: unknown): CustomSite[] {
       continue;
     }
     seen.add(domain);
-    normalized.push({ domain, speed });
+    const profileId =
+      typeof item['profileId'] === 'string' && validIds.has(item['profileId'])
+        ? item['profileId']
+        : null;
+    normalized.push({ domain, speed, profileId });
   }
   return normalized;
 }
@@ -99,6 +153,9 @@ export function normalizeSettings(value: unknown): Settings {
         (site): site is BuiltInSiteType => isSiteType(site) && site !== 'other',
       )
     : [...DEFAULT_SETTINGS.supportedSites];
+  // Profiles are normalized first: site/custom-site assignments are only
+  // kept when they reference a profile that survived normalization.
+  const profiles = normalizeProfiles(stored['profiles']);
 
   return {
     extensionEnabled:
@@ -107,7 +164,7 @@ export function normalizeSettings(value: unknown): Settings {
         : DEFAULT_SETTINGS.extensionEnabled,
     playbackSpeed: legacySpeed,
     siteSpeeds,
-    customSites: normalizeCustomSites(stored['customSites']),
+    customSites: normalizeCustomSites(stored['customSites'], profiles),
     overlayEnabled:
       typeof stored['overlayEnabled'] === 'boolean'
         ? stored['overlayEnabled']
@@ -117,6 +174,8 @@ export function normalizeSettings(value: unknown): Settings {
         ? stored['autoApply']
         : DEFAULT_SETTINGS.autoApply,
     supportedSites,
+    profiles,
+    siteProfiles: normalizeSiteProfiles(stored['siteProfiles'], profiles),
   };
 }
 

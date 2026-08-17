@@ -193,7 +193,13 @@ function stop(): void {
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
+/** Whether speed enforcement is actively running in this tab. */
+function isRunning(): boolean {
+  return running;
+}
+
 export const Integration = {
   start,
   stop,
+  isRunning,
 } as const;

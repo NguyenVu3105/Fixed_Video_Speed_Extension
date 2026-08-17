@@ -42,6 +42,10 @@ export interface Statistics {
 /** Read-only snapshot returned by StatisticsService.getSummary(). */
 export interface StatisticsSummary {
   today: PeriodStats;
+  /** Aggregate of the last 7 days (including today). */
+  week: PeriodStats;
   total: PeriodStats;
   activeSessions: number;
+  /** Time-weighted average playback speed, or null with no recorded data. */
+  avgSpeed: number | null;
 }

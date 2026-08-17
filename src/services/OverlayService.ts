@@ -1,6 +1,18 @@
 const overlays = new Map<HTMLVideoElement, HTMLDivElement>();
 let enabled = false;
 let frameId: number | null = null;
+/** True while a temporary preview is showing overlays despite `enabled` being off. */
+let previewing = false;
+/** Pending timeout hiding a temporary preview; null when no preview is active. */
+let previewTimeoutId: number | null = null;
+
+function cancelPreview(): void {
+  if (previewTimeoutId !== null) {
+    window.clearTimeout(previewTimeoutId);
+    previewTimeoutId = null;
+  }
+  previewing = false;
+}
 
 function update(video: HTMLVideoElement, overlay: HTMLDivElement): void {
   if (!video.isConnected || video.readyState === 0) {
@@ -20,17 +32,19 @@ function update(video: HTMLVideoElement, overlay: HTMLDivElement): void {
 
 function tick(): void {
   frameId = null;
-  if (!enabled) return;
+  if (!enabled && !previewing) return;
   for (const [video, overlay] of overlays) update(video, overlay);
   if (overlays.size > 0) frameId = window.requestAnimationFrame(tick);
 }
 
 function scheduleUpdate(): void {
-  if (frameId === null && enabled) frameId = window.requestAnimationFrame(tick);
+  if (frameId === null && (enabled || previewing)) {
+    frameId = window.requestAnimationFrame(tick);
+  }
 }
 
 function attach(video: HTMLVideoElement): void {
-  if (!enabled || overlays.has(video)) return;
+  if ((!enabled && !previewing) || overlays.has(video)) return;
 
   const overlay = document.createElement('div');
   overlay.className = 'fixed-video-speed-overlay';
@@ -74,6 +88,7 @@ function detachAll(): void {
 
 function setEnabled(next: boolean): void {
   enabled = next;
+  cancelPreview();
   if (!enabled) {
     detachAll();
     return;
@@ -82,10 +97,30 @@ function setEnabled(next: boolean): void {
   scheduleUpdate();
 }
 
+/**
+ * Temporarily shows the speed overlay without changing the persisted
+ * `overlayEnabled` setting. When overlays are already enabled this is a
+ * no-op that simply reports true. Returns whether any overlay is showing.
+ */
+function preview(durationMs = 2500): boolean {
+  if (enabled) return overlays.size > 0;
+  cancelPreview();
+  previewing = true;
+  for (const video of document.querySelectorAll('video')) attach(video);
+  scheduleUpdate();
+  previewTimeoutId = window.setTimeout(() => {
+    previewTimeoutId = null;
+    previewing = false;
+    if (!enabled) detachAll();
+  }, durationMs);
+  return overlays.size > 0;
+}
+
 export const OverlayService = {
   attach,
   detach,
   detachAll,
   setEnabled,
+  preview,
 } as const;
 

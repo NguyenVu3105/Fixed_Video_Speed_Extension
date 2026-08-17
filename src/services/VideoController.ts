@@ -302,6 +302,16 @@ function subscribe(cb: PlaybackEventCallback): () => void {
   };
 }
 
+/** Number of video elements currently attached by the extension. */
+function getAttachedCount(): number {
+  return attached.size;
+}
+
+/** Current global target playback speed. */
+function getSpeed(): number {
+  return currentSpeed;
+}
+
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 export const VideoController = {
@@ -311,4 +321,6 @@ export const VideoController = {
   forceSpeed,
   detachAll,
   subscribe,
+  getAttachedCount,
+  getSpeed,
 } as const;

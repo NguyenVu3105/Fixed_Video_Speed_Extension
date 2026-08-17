@@ -1,4 +1,5 @@
 import type {
+  PeriodStats,
   Statistics,
   StatisticsChangeCallback,
   StatisticsSummary,
@@ -266,13 +267,46 @@ function notifyVisible(): void {
   autoPaused.clear();
 }
 
+/** Sums the daily buckets of the last 7 days (including today). */
+function summarizeWeek(s: Statistics, now: number): PeriodStats {
+  const week = createEmptyPeriodStats();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = s.daily[toDateKey(now - offset * DAY_MS)];
+    if (day === undefined) continue;
+    week.watchedSeconds += day.watchedSeconds;
+    week.savedSeconds += day.savedSeconds;
+    week.sessionCount += day.sessionCount;
+  }
+  week.watchedSeconds = roundSeconds(week.watchedSeconds);
+  week.savedSeconds = roundSeconds(week.savedSeconds);
+  return week;
+}
+
+/** Time-weighted average speed across all recorded history segments. */
+function computeAverageSpeed(s: Statistics): number | null {
+  let weighted = 0;
+  let seconds = 0;
+  for (const session of s.history) {
+    for (const segment of session.segments) {
+      weighted += segment.speed * segment.seconds;
+      seconds += segment.seconds;
+    }
+  }
+  if (seconds <= 0) return null;
+  return Math.round((weighted / seconds) * 100) / 100;
+}
+
 async function getSummary(): Promise<StatisticsSummary> {
   const s = await ensureStats();
-  const day = s.daily[toDateKey(Date.now())];
+  const now = Date.now();
+  const day = s.daily[toDateKey(now)];
   return {
     today: day !== undefined ? { ...day } : createEmptyPeriodStats(),
+    week: summarizeWeek(s, now),
     total: { ...s.total },
     activeSessions: active.size,
+    avgSpeed: computeAverageSpeed(s),
   };
 }
 
