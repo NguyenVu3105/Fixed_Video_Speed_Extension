@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import type { PeriodStats } from '../../types';
-import { formatDuration } from '../utils/formatters';
+import { formatDuration, useI18n } from '../i18n';
 import { ClockIcon, ZapIcon, BarChartIcon } from './icons';
 
 const PLACEHOLDER = '—';
@@ -32,6 +32,7 @@ interface StatisticsCardProps {
 }
 
 export function StatisticsCard({ today, week, allTime }: StatisticsCardProps): ReactElement {
+  const { t } = useI18n();
   const watched = (p: PeriodStats | null): string =>
     p === null ? PLACEHOLDER : formatDuration(p.watchedSeconds);
   const saved = (p: PeriodStats | null): string =>
@@ -45,18 +46,18 @@ export function StatisticsCard({ today, week, allTime }: StatisticsCardProps): R
         {title}
       </span>
       <div className="stats-grid">
-        <StatItem icon={<ClockIcon size={14} />} label="Watched" value={watched(period)} />
-        <StatItem icon={<ZapIcon size={14} />} label="Saved" value={saved(period)} highlight />
-        <StatItem icon={<BarChartIcon size={14} />} label="Sessions" value={sessions(period)} full />
+        <StatItem icon={<ClockIcon size={14} />} label={t('statistics.watched')} value={watched(period)} />
+        <StatItem icon={<ZapIcon size={14} />} label={t('statistics.saved')} value={saved(period)} highlight />
+        <StatItem icon={<BarChartIcon size={14} />} label={t('statistics.sessions')} value={sessions(period)} full />
       </div>
     </div>
   );
 
   return (
     <div>
-      {group('Today', today, false)}
-      {group('This week', week, true)}
-      {group('All time', allTime, true)}
+      {group(t('statistics.today'), today, false)}
+      {group(t('statistics.thisWeek'), week, true)}
+      {group(t('statistics.allTime'), allTime, true)}
     </div>
   );
 }

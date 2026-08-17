@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import { DIAL_STEP, DIAL_TICKS, SPEED_MAX, SPEED_MIN } from '../constants';
+import { useI18n } from '../i18n';
 
 // ─── Geometry ────────────────────────────────────────────────────────────────
 // The gauge sweeps 270° with the gap centered at the bottom. Angles (φ) are
@@ -83,6 +84,7 @@ interface SpeedDialProps {
 }
 
 export function SpeedDial({ speed, onChange }: SpeedDialProps): ReactElement {
+  const { t: tr } = useI18n();
   const svgRef = useRef<SVGSVGElement>(null);
   // `value` is what we render; `valueRef` mirrors it so the rAF stepping loop
   // always reads the latest value without going stale between renders.
@@ -199,7 +201,7 @@ export function SpeedDial({ speed, onChange }: SpeedDialProps): ReactElement {
         className="speed-dial__svg"
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
         role="slider"
-        aria-label="Playback speed dial"
+        aria-label={tr('speed.dial')}
         aria-valuemin={SPEED_MIN}
         aria-valuemax={SPEED_MAX}
         aria-valuenow={value}

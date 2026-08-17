@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 import type { CustomSite } from '../../types';
 import { SPEED_MAX, SPEED_MIN, SPEED_STEP } from '../constants';
+import { useI18n } from '../i18n';
 import { GlobeIcon, XIcon } from './icons';
 
 interface CustomSitesCardProps {
@@ -21,6 +22,7 @@ export function CustomSitesCard({
   onChangeSpeed,
   onRemove,
 }: CustomSitesCardProps): ReactElement {
+  const { t } = useI18n();
   const [domain, setDomain] = useState('');
 
   function submit(event: FormEvent<HTMLFormElement>): void {
@@ -34,25 +36,25 @@ export function CustomSitesCard({
     <div className="card card-section custom-sites-card">
       <div>
         <span className="section-title">
-          <GlobeIcon size={12} /> Custom websites
+          <GlobeIcon size={12} /> {t('sites.custom')}
         </span>
-        <p className="custom-sites__hint">Add a domain to apply a fixed speed to its videos.</p>
+        <p className="custom-sites__hint">{t('sites.customHint')}</p>
       </div>
       <form className="custom-site-form" onSubmit={submit}>
         <input
           className="custom-site-form__input"
           type="text"
           value={domain}
-          placeholder="example.com"
-          aria-label="Custom website domain"
+          placeholder={t('sites.domainPlaceholder')}
+          aria-label={t('sites.domainLabel')}
           onChange={(event) => { setDomain(event.target.value); }}
         />
         <button className="action-btn custom-site-form__button" type="submit">
-          Add
+          {t('sites.add')}
         </button>
       </form>
       {sites.length === 0 ? (
-        <p className="custom-sites__empty">No custom domains yet.</p>
+        <p className="custom-sites__empty">{t('sites.empty')}</p>
       ) : (
         <div className="custom-sites__list">
           {sites.map((site) => (
@@ -65,18 +67,17 @@ export function CustomSitesCard({
                   max={SPEED_MAX}
                   step={SPEED_STEP}
                   value={site.speed}
-                  aria-label={`Speed for ${site.domain}`}
+                  aria-label={t('sites.speedFor', { site: site.domain })}
                   onChange={(event) => {
                     const value = event.target.valueAsNumber;
                     if (Number.isFinite(value)) onChangeSpeed(site.domain, clampSpeed(value));
                   }}
                 />
-                <span>x</span>
               </label>
               <button
                 className="custom-site-row__remove"
                 type="button"
-                aria-label={`Remove ${site.domain}`}
+                aria-label={t('sites.removeSite', { site: site.domain })}
                 onClick={() => { onRemove(site.domain); }}
               >
                 <XIcon size={14} />
@@ -88,4 +89,3 @@ export function CustomSitesCard({
     </div>
   );
 }
-

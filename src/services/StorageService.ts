@@ -1,6 +1,7 @@
 import type {
   CustomSite,
   BuiltInSiteType,
+  Language,
   SiteType,
   Settings,
   SettingsChangeCallback,
@@ -34,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   supportedSites: [...SUPPORTED_SITE_TYPES],
   profiles: [...DEFAULT_PROFILES],
   siteProfiles: {},
+  language: 'en',
 };
 
 const DEFAULT_STATISTICS: Statistics = {
@@ -60,6 +62,10 @@ function isValidSpeed(value: unknown): value is number {
 
 function isSiteType(value: unknown): value is SiteType {
   return typeof value === 'string' && SITE_TYPES.includes(value as SiteType);
+}
+
+function isLanguage(value: unknown): value is Language {
+  return value === 'en' || value === 'vi';
 }
 
 function normalizeProfiles(value: unknown): SpeedProfile[] {
@@ -176,6 +182,9 @@ export function normalizeSettings(value: unknown): Settings {
     supportedSites,
     profiles,
     siteProfiles: normalizeSiteProfiles(stored['siteProfiles'], profiles),
+    language: isLanguage(stored['language'])
+      ? stored['language']
+      : DEFAULT_SETTINGS.language,
   };
 }
 

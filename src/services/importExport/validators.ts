@@ -216,6 +216,8 @@ function validateSettings(v: unknown): Result<Settings> {
       supportedSites: v['supportedSites'] as BuiltInSiteType[],
       profiles: effectiveProfiles,
       siteProfiles,
+      // Optional in exports; unknown values fall back to the default.
+      language: v['language'] === 'en' || v['language'] === 'vi' ? v['language'] : 'en',
     },
   };
 }

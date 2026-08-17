@@ -2,6 +2,7 @@ export { SITE_TYPES, SUPPORTED_SITE_TYPES } from './site';
 export type { BuiltInSiteType, SiteType } from './site';
 export type {
   CustomSite,
+  Language,
   Settings,
   DefaultSettings,
   SiteSpeeds,

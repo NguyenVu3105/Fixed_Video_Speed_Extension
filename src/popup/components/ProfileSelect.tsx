@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import type { SpeedProfile } from '../../types';
+import { useI18n } from '../i18n';
 import { ChevronDownIcon } from './icons';
 
 /** Sentinel value for the "no profile assigned" option. */
@@ -16,22 +17,23 @@ export function ProfileSelect({
   selectedProfileId,
   onSelect,
 }: ProfileSelectProps): ReactElement {
+  const { t } = useI18n();
   return (
     <div className="profile-select">
       <span className="profile-select__label">
-        Profile
-        <span className="profile-select__hint">Speed preset for this site</span>
+        {t('profile.label')}
+        <span className="profile-select__hint">{t('profile.hint')}</span>
       </span>
       <span className="profile-select__control">
         <select
-          aria-label="Speed profile for this site"
+          aria-label={t('profile.hint')}
           value={selectedProfileId ?? CUSTOM}
           onChange={(event) => {
             const value = event.target.value;
             onSelect(value === CUSTOM ? null : value);
           }}
         >
-          <option value={CUSTOM}>Custom</option>
+          <option value={CUSTOM}>{t('profile.custom')}</option>
           {profiles.map((profile) => (
             <option key={profile.id} value={profile.id}>
               {profile.name} · {profile.speed}x

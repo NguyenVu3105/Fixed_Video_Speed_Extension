@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactElement } from "react";
-import type { Settings, Result, ImportMode, SiteType, StatisticsSummary } from "../types";
+import type { Language, Settings, Result, ImportMode, SiteType, StatisticsSummary } from "../types";
 import { DEFAULT_SETTINGS, StorageService } from "../services/StorageService";
 import {
   exportData,
@@ -8,7 +8,7 @@ import {
   getExportFilename,
 } from "../services/importExport";
 import { StatisticsService } from "../services/statistics";
-import { formatDuration } from "./utils/formatters";
+import { formatDuration, setLanguage, useI18n } from "./i18n";
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
 import type { TabId } from "./components/BottomNav";
@@ -26,6 +26,7 @@ import { useContentState } from "./hooks/useContentState";
 // ─── Loading State ────────────────────────────────────────────────────────────
 
 function LoadingView(): ReactElement {
+  const { t } = useI18n();
   return (
     <div className="app">
       <Header />
@@ -33,9 +34,9 @@ function LoadingView(): ReactElement {
         <div
           className="card card-section loading-state"
           aria-busy="true"
-          aria-label="Loading settings"
+          aria-label={t('loading.settings')}
         >
-          <span className="loading-state__text">Loading…</span>
+          <span className="loading-state__text">{t('loading.text')}</span>
         </div>
       </main>
     </div>
@@ -45,6 +46,7 @@ function LoadingView(): ReactElement {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export function App(): ReactElement {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [currentSite, setCurrentSite] = useState<CurrentSite | null>(null);
   const [currentSiteLoading, setCurrentSiteLoading] = useState(true);
@@ -106,6 +108,12 @@ export function App(): ReactElement {
     };
   }, []);
 
+  // Keep the i18n store in sync with the persisted language choice.
+  useEffect(() => {
+    if (settings === null) return;
+    setLanguage(settings.language);
+  }, [settings]);
+
   useEffect(() => {
     if (settings === null) return;
     let mounted = true;
@@ -157,18 +165,18 @@ export function App(): ReactElement {
       void StorageService.saveSettings(next)
         .then((r) => {
           if (!r.ok) {
-            setStatusMessage(`Save failed: ${r.error}`);
+            setStatusMessage(t('status.saveFailed', { error: r.error }));
             setStatusError(true);
           }
         })
         .catch((err) => {
           const m = err instanceof Error ? err.message : String(err);
-          setStatusMessage(`Save failed: ${m}`);
+          setStatusMessage(t('status.saveFailed', { error: m }));
           setStatusError(true);
         });
       return next;
     });
-  }, []);
+  }, [t]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -182,6 +190,13 @@ export function App(): ReactElement {
   const handleToggleOverlay = useCallback(
     (enabled: boolean) => {
       save({ overlayEnabled: enabled });
+    },
+    [save],
+  );
+
+  const handleChangeLanguage = useCallback(
+    (language: Language) => {
+      save({ language });
     },
     [save],
   );
@@ -281,21 +296,21 @@ export function App(): ReactElement {
       if (settings === null) return;
       const domain = normalizeCustomDomain(input);
       if (domain === null) {
-        showStatus("Enter a valid domain, such as example.com.", true);
+        showStatus(t('status.invalidDomain'), true);
         return;
       }
       if (getSiteDefinition(domain) !== null) {
-        showStatus("This website is already supported automatically.", true);
+        showStatus(t('status.alreadySupported'), true);
         return;
       }
       if (settings.customSites.some((site) => site.domain === domain)) {
-        showStatus("This domain is already in your custom sites.", true);
+        showStatus(t('status.alreadyAdded'), true);
         return;
       }
       save({ customSites: [...settings.customSites, { domain, speed: 1, profileId: null }] });
-      showStatus(`${domain} added.`, false);
+      showStatus(t('status.domainAdded', { domain }), false);
     },
-    [save, settings, showStatus],
+    [save, settings, showStatus, t],
   );
 
   const handleCustomSiteSpeedChange = useCallback(
@@ -314,9 +329,9 @@ export function App(): ReactElement {
     (domain: string) => {
       if (settings === null) return;
       save({ customSites: settings.customSites.filter((site) => site.domain !== domain) });
-      showStatus(`${domain} removed.`, false);
+      showStatus(t('status.domainRemoved', { domain }), false);
     },
-    [save, settings, showStatus],
+    [save, settings, showStatus, t],
   );
 
   // ── Profile management ────────────────────────────────────────────────────
@@ -379,7 +394,7 @@ export function App(): ReactElement {
     try {
       const result = await exportData();
       if (!result.ok) {
-        showStatus(`Export failed: ${result.error}`, true);
+        showStatus(t('status.exportFailed', { error: result.error }), true);
         return;
       }
       const blob = new Blob([result.value], { type: "application/json" });
@@ -389,15 +404,15 @@ export function App(): ReactElement {
       a.download = getExportFilename();
       a.click();
       URL.revokeObjectURL(url);
-      showStatus("Export complete.", false);
+      showStatus(t('status.exportDone'), false);
     } catch (err) {
       const m = err instanceof Error ? err.message : String(err);
-      showStatus(`Export failed: ${m}`, true);
+      showStatus(t('status.exportFailed', { error: m }), true);
     } finally {
       exportingRef.current = false;
       setExporting(false);
     }
-  }, [showStatus]);
+  }, [showStatus, t]);
 
   const triggerFilePicker = useCallback((mode: ImportMode) => {
     importModeRef.current = mode;
@@ -421,16 +436,16 @@ export function App(): ReactElement {
       await StatisticsService.resetStatistics();
       const s: StatisticsSummary = await StatisticsService.getSummary();
       setSummary(s);
-      showStatus("Statistics reset.", false);
+      showStatus(t('status.statsReset'), false);
     } catch (err) {
       setSummary(null);
       const m = err instanceof Error ? err.message : String(err);
-      showStatus(`Reset failed: ${m}`, true);
+      showStatus(t('status.resetFailed', { error: m }), true);
     } finally {
       resettingRef.current = false;
       setResetting(false);
     }
-  }, [showStatus]);
+  }, [showStatus, t]);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -450,22 +465,27 @@ export function App(): ReactElement {
           if (settingsR.ok) setSettings(settingsR.value);
           const { total } = await StatisticsService.exportStatistics();
           showStatus(
-            `Imported (${importModeRef.current}) — ${String(total.sessionCount)} sessions, ${formatDuration(total.watchedSeconds)} watched, ${formatDuration(total.savedSeconds)} saved.`,
+            t('status.importDone', {
+              mode: importModeRef.current,
+              sessions: total.sessionCount,
+              watched: formatDuration(total.watchedSeconds),
+              saved: formatDuration(total.savedSeconds),
+            }),
             false,
           );
         } else {
-          showStatus(`Import failed: ${result.error}`, true);
+          showStatus(t('status.importFailed', { error: result.error }), true);
         }
       } catch (err) {
         const m = err instanceof Error ? err.message : String(err);
-        showStatus(`Import failed: ${m}`, true);
+        showStatus(t('status.importFailed', { error: m }), true);
       } finally {
         importingRef.current = false;
         setImporting(false);
         e.target.value = "";
       }
     },
-    [showStatus],
+    [showStatus, t],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -509,6 +529,7 @@ export function App(): ReactElement {
             resetting={resetting}
             onToggleEnabled={handleToggleEnabled}
             onToggleOverlay={handleToggleOverlay}
+            onChangeLanguage={handleChangeLanguage}
             onAddProfile={handleAddProfile}
             onRenameProfile={handleRenameProfile}
             onChangeProfileSpeed={handleProfileSpeedChange}

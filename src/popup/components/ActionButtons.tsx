@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { useI18n } from '../i18n';
 import { DownloadIcon, UploadIcon, RotateCcwIcon } from './icons';
 
 interface ActionButtonsProps {
@@ -24,6 +25,7 @@ export function ActionButtons({
   statusMessage,
   statusError,
 }: ActionButtonsProps): ReactElement {
+  const { t } = useI18n();
   return (
     <div>
       <div className="action-buttons">
@@ -31,41 +33,41 @@ export function ActionButtons({
           id="btn-import-replace"
           type="button"
           className="action-btn"
-          aria-label="Import and Replace"
+          aria-label={t('data.replace')}
           disabled={exporting || importing}
           onClick={onImportReplace}
         >
-          {importing ? 'Importing…' : (<><UploadIcon size={12} /> Replace</>)}
+          {importing ? t('data.importing') : (<><UploadIcon size={12} /> {t('data.replace')}</>)}
         </button>
         <button
           id="btn-import-merge"
           type="button"
           className="action-btn"
-          aria-label="Import and Merge"
+          aria-label={t('data.merge')}
           disabled={exporting || importing}
           onClick={onImportMerge}
         >
-          {importing ? 'Importing…' : (<><UploadIcon size={12} /> Merge</>)}
+          {importing ? t('data.importing') : (<><UploadIcon size={12} /> {t('data.merge')}</>)}
         </button>
         <button
           id="btn-export"
           type="button"
           className="action-btn"
-          aria-label="Export"
+          aria-label={t('data.export')}
           disabled={exporting || importing}
           onClick={onExport}
         >
-          {exporting ? 'Exporting…' : (<><DownloadIcon size={12} /> Export</>)}
+          {exporting ? t('data.exporting') : (<><DownloadIcon size={12} /> {t('data.export')}</>)}
         </button>
         <button
           id="btn-reset"
           type="button"
           className="action-btn action-btn--danger"
-          aria-label="Reset Stats"
+          aria-label={t('data.reset')}
           disabled={exporting || importing || resetting}
           onClick={onReset}
         >
-          {resetting ? 'Resetting…' : (<><RotateCcwIcon size={12} /> Reset</>)}
+          {resetting ? t('data.resetting') : (<><RotateCcwIcon size={12} /> {t('data.reset')}</>)}
         </button>
       </div>
       {statusMessage !== null && (

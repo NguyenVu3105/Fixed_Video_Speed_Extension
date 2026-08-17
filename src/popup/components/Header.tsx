@@ -1,11 +1,13 @@
 import type { ReactElement } from 'react';
 import { EXTENSION_NAME, EXTENSION_VERSION } from '../constants';
+import { useI18n } from '../i18n';
 
 interface HeaderProps {
   readonly enabled?: boolean;
 }
 
 export function Header({ enabled = true }: HeaderProps): ReactElement {
+  const { t } = useI18n();
   return (
     <header className="app-header">
       <img
@@ -21,7 +23,7 @@ export function Header({ enabled = true }: HeaderProps): ReactElement {
       </div>
       <span className={`app-header__badge${enabled ? ' app-header__badge--active' : ''}`}>
         <span className="app-header__badge-dot" aria-hidden="true" />
-        {enabled ? 'Active' : 'Off'}
+        {enabled ? t('header.active') : t('header.off')}
       </span>
     </header>
   );

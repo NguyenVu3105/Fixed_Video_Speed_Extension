@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import type { Settings, SiteType } from "../../types";
 import { SITE_DEFINITIONS } from "../../services/sites";
 import { SPEED_MAX, SPEED_MIN, SPEED_STEP } from "../constants";
+import { useI18n } from "../i18n";
 import { CustomSitesCard } from "./CustomSitesCard";
 import { GlobeIcon, XIcon } from "./icons";
 
@@ -26,11 +27,12 @@ export function SitesPage({
   onChangeCustomSpeed,
   onRemoveCustomSite,
 }: SitesPageProps): ReactElement {
+  const { t } = useI18n();
   return (
     <div className="tab-page">
       <div className="card card-section">
         <span className="section-title">
-          <GlobeIcon size={12} /> Supported websites
+          <GlobeIcon size={12} /> {t('sites.supported')}
         </span>
         <div className="site-list">
           {SITE_DEFINITIONS.map((definition) => (
@@ -48,7 +50,7 @@ export function SitesPage({
                   max={SPEED_MAX}
                   step={SPEED_STEP}
                   value={settings.siteSpeeds[definition.type]}
-                  aria-label={`Speed for ${definition.label}`}
+                  aria-label={t('sites.speedFor', { site: definition.label })}
                   onChange={(event) => {
                     const value = event.target.valueAsNumber;
                     if (Number.isFinite(value)) {
@@ -60,8 +62,8 @@ export function SitesPage({
               <button
                 className="site-row__clear"
                 type="button"
-                aria-label={`Reset ${definition.label} speed to 1x`}
-                title="Reset to 1x"
+                aria-label={`${definition.label}: ${t('sites.resetTo1x')}`}
+                title={t('sites.resetTo1x')}
                 onClick={() => {
                   onClearSiteSpeed(definition.type);
                 }}

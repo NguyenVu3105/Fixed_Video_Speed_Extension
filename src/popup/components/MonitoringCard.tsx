@@ -3,6 +3,7 @@ import type { CurrentSite } from '../utils/currentSite';
 import type { ContentState } from '../../types/messages';
 import { ProfileSelect } from './ProfileSelect';
 import type { SpeedProfile } from '../../types';
+import { useI18n } from '../i18n';
 import { ActivityIcon, GlobeIcon, PlusIcon } from './icons';
 
 interface MonitoringCardProps {
@@ -26,16 +27,17 @@ export function MonitoringCard({
   onSelectProfile,
   onAddDomain,
 }: MonitoringCardProps): ReactElement {
+  const { t } = useI18n();
   const videoCount = contentState?.videoCount ?? 0;
   const videosLabel = loading
-    ? 'Detecting videos…'
+    ? t('monitoring.detecting')
     : contentState === null
       ? site === null
-        ? 'No webpage detected'
-        : 'Content script unreachable'
+        ? t('monitoring.noPage')
+        : t('monitoring.unreachable')
       : videoCount === 1
-        ? '1 video detected'
-        : `${String(videoCount)} videos detected`;
+        ? t('monitoring.oneVideo')
+        : t('monitoring.videos', { count: videoCount });
 
   const canAddCurrentDomain =
     !loading && site !== null && !site.supported;
@@ -52,7 +54,7 @@ export function MonitoringCard({
         </span>
         <div className="monitoring-card__copy">
           <span className="monitoring-card__hostname">
-            {loading ? 'Loading…' : site?.hostname ?? 'Open a video website'}
+            {loading ? t('loading.text') : site?.hostname ?? t('monitoring.openSite')}
           </span>
           <span className="monitoring-card__videos">{videosLabel}</span>
         </div>
@@ -62,14 +64,14 @@ export function MonitoringCard({
             type="button"
             onClick={() => { onAddDomain(site.hostname); }}
           >
-            <PlusIcon size={12} /> Add
+            <PlusIcon size={12} /> {t('monitoring.add')}
           </button>
         ) : (
           <span
             className={`monitoring-card__status${monitoring ? ' monitoring-card__status--live' : ''}`}
           >
             <ActivityIcon size={12} />
-            {monitoring ? 'Monitoring' : 'Idle'}
+            {monitoring ? t('monitoring.monitoring') : t('monitoring.idle')}
           </span>
         )}
       </div>

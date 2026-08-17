@@ -1,4 +1,6 @@
 import type { ReactElement } from 'react';
+import { useI18n } from '../i18n';
+import type { TranslationKey } from '../i18n';
 import {
   BarChartIcon,
   DownloadIcon,
@@ -9,12 +11,12 @@ import {
 
 export type TabId = 'dashboard' | 'sites' | 'statistics' | 'settings' | 'data';
 
-const TABS: readonly { id: TabId; label: string; icon: (size: number) => ReactElement }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: (size) => <HomeIcon size={size} /> },
-  { id: 'sites', label: 'Sites', icon: (size) => <GlobeIcon size={size} /> },
-  { id: 'statistics', label: 'Statistics', icon: (size) => <BarChartIcon size={size} /> },
-  { id: 'settings', label: 'Settings', icon: (size) => <SlidersIcon size={size} /> },
-  { id: 'data', label: 'Import / Export', icon: (size) => <DownloadIcon size={size} /> },
+const TABS: readonly { id: TabId; labelKey: TranslationKey; icon: (size: number) => ReactElement }[] = [
+  { id: 'dashboard', labelKey: 'nav.dashboard', icon: (size) => <HomeIcon size={size} /> },
+  { id: 'sites', labelKey: 'nav.sites', icon: (size) => <GlobeIcon size={size} /> },
+  { id: 'statistics', labelKey: 'nav.statistics', icon: (size) => <BarChartIcon size={size} /> },
+  { id: 'settings', labelKey: 'nav.settings', icon: (size) => <SlidersIcon size={size} /> },
+  { id: 'data', labelKey: 'nav.data', icon: (size) => <DownloadIcon size={size} /> },
 ];
 
 interface BottomNavProps {
@@ -23,6 +25,7 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ active, onChange }: BottomNavProps): ReactElement {
+  const { t } = useI18n();
   return (
     <nav className="bottom-nav" aria-label="Main navigation">
       {TABS.map((tab) => (
@@ -34,7 +37,7 @@ export function BottomNav({ active, onChange }: BottomNavProps): ReactElement {
           onClick={() => { onChange(tab.id); }}
         >
           {tab.icon(16)}
-          <span>{tab.label}</span>
+          <span>{t(tab.labelKey)}</span>
         </button>
       ))}
     </nav>

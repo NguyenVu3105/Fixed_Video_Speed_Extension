@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
+import { useI18n } from '../i18n';
 
 interface SpeedControllerProps {
   readonly speed: number;
@@ -7,6 +8,7 @@ interface SpeedControllerProps {
 }
 
 export function SpeedController({ speed, onSpeedChange }: SpeedControllerProps): ReactElement {
+  const { t } = useI18n();
   // Local text mirrors the current speed. Valid typed values (> 0) are saved
   // immediately; the text re-syncs from the speed whenever an outside source
   // (dial, presets, profile) changes it.
@@ -41,7 +43,7 @@ export function SpeedController({ speed, onSpeedChange }: SpeedControllerProps):
   return (
     <div className="speed-controller">
       <div>
-        <span className="speed-controller__label">Current Speed</span>
+        <span className="speed-controller__label">{t('speed.current')}</span>
         <div className="speed-controller__value">
           <span className="speed-controller__number">{speed.toFixed(2)}</span>
           <span className="speed-controller__unit">x</span>
@@ -53,11 +55,11 @@ export function SpeedController({ speed, onSpeedChange }: SpeedControllerProps):
           min="0.01"
           step="any"
           value={text}
-          aria-label="Custom speed, any value greater than zero"
+          aria-label={t('speed.custom')}
           onChange={(event) => { commitText(event.target.value); }}
           onBlur={revertIfInvalid}
         />
-        <span className="speed-controller__custom-hint">Custom (&gt; 0)</span>
+        <span className="speed-controller__custom-hint">{t('speed.custom')}</span>
       </label>
     </div>
   );

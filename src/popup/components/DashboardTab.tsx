@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import type { Settings, StatisticsSummary } from '../../types';
 import type { ContentState } from '../../types/messages';
 import type { CurrentSite } from '../utils/currentSite';
+import { useI18n } from '../i18n';
 import { MonitoringCard } from './MonitoringCard';
 import { SpeedController } from './SpeedController';
 import { SpeedDial } from './SpeedDial';
@@ -33,6 +34,7 @@ export function DashboardTab({
   onSelectProfile,
   onAddDomain,
 }: DashboardTabProps): ReactElement {
+  const { t } = useI18n();
   const siteSupported = currentSite?.supported === true && !currentSiteLoading;
   const monitoring = siteSupported && settings.extensionEnabled;
   const controlsDisabled = !siteSupported;
@@ -58,10 +60,7 @@ export function DashboardTab({
           onSelect={onSpeedChange}
         />
         {!siteSupported && !currentSiteLoading && (
-          <p className="settings-hint">
-            Open a supported video website — or add its domain in Sites — to
-            control its speed.
-          </p>
+          <p className="settings-hint">{t('speed.unsupportedHint')}</p>
         )}
       </div>
       <DashboardStats summary={summary} />

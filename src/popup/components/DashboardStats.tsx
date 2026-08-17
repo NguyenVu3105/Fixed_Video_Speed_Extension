@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import type { StatisticsSummary } from '../../types';
-import { formatDuration } from '../utils/formatters';
+import { formatDuration, useI18n } from '../i18n';
 import { ClockIcon, HourglassIcon, InfoIcon, VideoIcon, GaugeIcon } from './icons';
 
 interface DashboardStatsProps {
@@ -8,6 +8,7 @@ interface DashboardStatsProps {
 }
 
 export function DashboardStats({ summary }: DashboardStatsProps): ReactElement {
+  const { t } = useI18n();
   const week = summary?.week ?? null;
   const avgSpeed = summary?.avgSpeed ?? null;
 
@@ -20,8 +21,8 @@ export function DashboardStats({ summary }: DashboardStatsProps): ReactElement {
         <span className="stat-tile__value">
           {week === null ? '—' : formatDuration(week.watchedSeconds)}
         </span>
-        <span className="stat-tile__label">Watched</span>
-        <span className="stat-tile__sub">This week</span>
+        <span className="stat-tile__label">{t('stats.watched')}</span>
+        <span className="stat-tile__sub">{t('stats.thisWeek')}</span>
       </div>
       <div className="stat-tile">
         <span className="stat-tile__head stat-tile__head--pink">
@@ -30,8 +31,8 @@ export function DashboardStats({ summary }: DashboardStatsProps): ReactElement {
         <span className="stat-tile__value">
           {week === null ? '—' : String(week.sessionCount)}
         </span>
-        <span className="stat-tile__label">Videos</span>
-        <span className="stat-tile__sub">This week</span>
+        <span className="stat-tile__label">{t('stats.videos')}</span>
+        <span className="stat-tile__sub">{t('stats.thisWeek')}</span>
       </div>
       <div className="stat-tile">
         <span className="stat-tile__head">
@@ -40,15 +41,15 @@ export function DashboardStats({ summary }: DashboardStatsProps): ReactElement {
         <span className="stat-tile__value">
           {avgSpeed === null ? '—' : `${avgSpeed.toFixed(1)}x`}
         </span>
-        <span className="stat-tile__label">Avg. Speed</span>
-        <span className="stat-tile__sub">All sessions</span>
+        <span className="stat-tile__label">{t('stats.avgSpeed')}</span>
+        <span className="stat-tile__sub">{t('stats.allSessions')}</span>
       </div>
       <div className="stat-tile">
         <span className="stat-tile__head stat-tile__head--green">
           <HourglassIcon size={14} />
           <span
             className="stat-tile__info"
-            title="Time saved compared to watching everything at 1x speed"
+            title={t('stats.savedTooltip')}
           >
             <InfoIcon size={11} />
           </span>
@@ -56,8 +57,8 @@ export function DashboardStats({ summary }: DashboardStatsProps): ReactElement {
         <span className="stat-tile__value">
           {week === null ? '—' : formatDuration(week.savedSeconds)}
         </span>
-        <span className="stat-tile__label">Time Saved</span>
-        <span className="stat-tile__sub">This week</span>
+        <span className="stat-tile__label">{t('stats.timeSaved')}</span>
+        <span className="stat-tile__sub">{t('stats.thisWeek')}</span>
       </div>
     </div>
   );

@@ -1,14 +1,16 @@
 import type { ReactElement } from 'react';
-import type { Settings, SpeedProfile } from '../../types';
+import type { Language, Settings, SpeedProfile } from '../../types';
 import { SPEED_MAX, SPEED_MIN, SPEED_STEP } from '../constants';
+import { useI18n } from '../i18n';
 import { ToggleSwitch } from './ToggleSwitch';
-import { EyeIcon, PlusIcon, PowerIcon, RotateCcwIcon, XIcon } from './icons';
+import { ChevronDownIcon, EyeIcon, GlobeIcon, PlusIcon, PowerIcon, RotateCcwIcon, XIcon } from './icons';
 
 interface SettingsPageProps {
   readonly settings: Settings;
   readonly resetting: boolean;
   readonly onToggleEnabled: (enabled: boolean) => void;
   readonly onToggleOverlay: (enabled: boolean) => void;
+  readonly onChangeLanguage: (language: Language) => void;
   readonly onAddProfile: () => void;
   readonly onRenameProfile: (id: string, name: string) => void;
   readonly onChangeProfileSpeed: (id: string, speed: number) => void;
@@ -53,7 +55,6 @@ function ProfileRow({
             if (Number.isFinite(value)) onChangeSpeed(profile.id, clampSpeed(value));
           }}
         />
-        <span>x</span>
       </label>
       <button
         className="profile-row__remove"
@@ -72,20 +73,22 @@ export function SettingsPage({
   resetting,
   onToggleEnabled,
   onToggleOverlay,
+  onChangeLanguage,
   onAddProfile,
   onRenameProfile,
   onChangeProfileSpeed,
   onRemoveProfile,
   onReset,
 }: SettingsPageProps): ReactElement {
+  const { t } = useI18n();
   return (
     <div className="tab-page">
       <div className="card card-section">
         <ToggleSwitch
           id="toggle-enabled"
           checked={settings.extensionEnabled}
-          label="Enable Extension"
-          subLabel="Apply the saved speed on supported sites"
+          label={t('settings.enable')}
+          subLabel={t('settings.enableSub')}
           icon={<PowerIcon size={14} />}
           onChange={onToggleEnabled}
         />
@@ -93,22 +96,47 @@ export function SettingsPage({
         <ToggleSwitch
           id="toggle-overlay"
           checked={settings.overlayEnabled}
-          label="Speed Overlay"
-          subLabel="Show the current speed on each video"
+          label={t('settings.overlay')}
+          subLabel={t('settings.overlaySub')}
           icon={<EyeIcon size={14} />}
           onChange={onToggleOverlay}
         />
+        <hr className="divider" />
+        <div className="row">
+          <div className="row__label">
+            <span className="row__label-text">
+              <GlobeIcon size={14} />
+              {t('settings.language')}
+            </span>
+            <span className="row__label-sub">{t('settings.languageSub')}</span>
+          </div>
+          <span className="profile-select__control">
+            <select
+              aria-label={t('settings.language')}
+              value={settings.language}
+              onChange={(event) => {
+                onChangeLanguage(event.target.value as Language);
+              }}
+            >
+              <option value="en">English</option>
+              <option value="vi">Tiếng Việt</option>
+            </select>
+            <span className="profile-select__chevron" aria-hidden="true">
+              <ChevronDownIcon size={12} />
+            </span>
+          </span>
+        </div>
       </div>
 
       <div className="card card-section">
         <div className="row">
-          <span className="section-title">Speed profiles</span>
+          <span className="section-title">{t('settings.profiles')}</span>
           <button
             className="action-btn custom-site-form__button"
             type="button"
             onClick={onAddProfile}
           >
-            <PlusIcon size={12} /> Add
+            <PlusIcon size={12} /> {t('settings.addProfile')}
           </button>
         </div>
         <div className="profile-manager">
@@ -122,20 +150,18 @@ export function SettingsPage({
             />
           ))}
         </div>
-        <p className="settings-hint">
-          Assign a profile to a website from the Dashboard to reuse its speed.
-        </p>
+        <p className="settings-hint">{t('settings.profileHint')}</p>
       </div>
 
       <div className="card card-section">
-        <span className="section-title">Danger zone</span>
+        <span className="section-title">{t('settings.dangerZone')}</span>
         <button
           className="action-btn action-btn--danger"
           type="button"
           disabled={resetting}
           onClick={onReset}
         >
-          {resetting ? 'Resetting…' : (<><RotateCcwIcon size={12} /> Reset statistics</>)}
+          {resetting ? t('settings.resetting') : (<><RotateCcwIcon size={12} /> {t('settings.resetStats')}</>)}
         </button>
       </div>
     </div>

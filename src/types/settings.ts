@@ -1,5 +1,8 @@
 import type { BuiltInSiteType, SiteType } from "./site";
 
+/** Popup display language. */
+export type Language = "en" | "vi";
+
 /** Playback speeds keyed by the detected website. */
 export type SiteSpeeds = Record<SiteType, number>;
 
@@ -32,6 +35,8 @@ export interface Settings {
   profiles: readonly SpeedProfile[];
   /** Profile id assigned per built-in site; absent means manual speed. */
   siteProfiles: Partial<Record<SiteType, string>>;
+  /** Popup display language. */
+  language: Language;
 }
 
 /** Fallback defaults used when storage is empty on first install. */
@@ -59,4 +64,5 @@ export interface DefaultSettings extends Settings {
   readonly supportedSites: readonly BuiltInSiteType[];
   readonly profiles: readonly SpeedProfile[];
   readonly siteProfiles: Record<string, never>;
+  readonly language: "en";
 }

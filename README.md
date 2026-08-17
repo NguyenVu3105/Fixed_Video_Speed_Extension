@@ -19,6 +19,8 @@ and user-added custom domains, so the player can't silently reset it.
   statistics tab; data can be exported/imported/reset from the data page.
 - **Live popup dashboard** — the popup talks directly to the content script
   to show the current video state and apply speed changes instantly.
+- **Bilingual popup** — switch the interface between English and Tiếng Việt
+  in Settings; the choice is saved with your settings.
 - Enable/disable toggle per extension; settings sync through `chrome.storage`.
 
 ## Popup tabs
@@ -29,7 +31,7 @@ and user-added custom domains, so the player can't silently reset it.
 | Sites | Per-site speeds and custom domain management |
 | Statistics | Watch-time stats per site |
 | Data | Import / export / reset settings and statistics |
-| Settings | Extension-wide options |
+| Settings | Extension toggles, language (English / Tiếng Việt), speed profiles |
 
 ## Development
 

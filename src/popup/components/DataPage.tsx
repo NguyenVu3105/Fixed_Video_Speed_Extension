@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { useI18n } from '../i18n';
 import { ActionButtons } from './ActionButtons';
 import { DownloadIcon } from './icons';
 
@@ -25,17 +26,14 @@ export function DataPage({
   onImportMerge,
   onReset,
 }: DataPageProps): ReactElement {
+  const { t } = useI18n();
   return (
     <div className="tab-page">
       <div className="card card-section">
         <span className="section-title">
-          <DownloadIcon size={12} /> Backup &amp; restore
+          <DownloadIcon size={12} /> {t('data.title')}
         </span>
-        <p className="settings-hint">
-          Export your settings, profiles and statistics to a JSON file, or
-          import a previous backup. Replace overwrites everything; Merge keeps
-          the larger of each statistic.
-        </p>
+        <p className="settings-hint">{t('data.hint')}</p>
         <ActionButtons
           exporting={exporting}
           importing={importing}
