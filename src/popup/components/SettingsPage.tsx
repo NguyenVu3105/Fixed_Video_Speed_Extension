@@ -4,10 +4,13 @@ import type { Language, Settings, SpeedProfile } from '../../types';
 import { useI18n } from '../i18n';
 import { ToggleSwitch } from './ToggleSwitch';
 import { SpeedNumberInput } from './SpeedNumberInput';
-import { ChevronDownIcon, EyeIcon, GlobeIcon, PlusIcon, PowerIcon, RotateCcwIcon, XIcon } from './icons';
+import { ActionButtons } from './ActionButtons';
+import { ChevronDownIcon, DownloadIcon, EyeIcon, GlobeIcon, PlusIcon, PowerIcon, RotateCcwIcon, XIcon } from './icons';
 
 interface SettingsPageProps {
   readonly settings: Settings;
+  readonly exporting: boolean;
+  readonly importing: boolean;
   readonly resetting: boolean;
   readonly onToggleEnabled: (enabled: boolean) => void;
   readonly onToggleOverlay: (enabled: boolean) => void;
@@ -16,6 +19,9 @@ interface SettingsPageProps {
   readonly onRenameProfile: (id: string, name: string) => void;
   readonly onChangeProfileSpeed: (id: string, speed: number) => void;
   readonly onRemoveProfile: (id: string) => void;
+  readonly onExport: () => void;
+  readonly onImportReplace: () => void;
+  readonly onImportMerge: () => void;
   readonly onReset: () => void;
 }
 
@@ -61,6 +67,8 @@ function ProfileRow({
 
 export function SettingsPage({
   settings,
+  exporting,
+  importing,
   resetting,
   onToggleEnabled,
   onToggleOverlay,
@@ -69,6 +77,9 @@ export function SettingsPage({
   onRenameProfile,
   onChangeProfileSpeed,
   onRemoveProfile,
+  onExport,
+  onImportReplace,
+  onImportMerge,
   onReset,
 }: SettingsPageProps): ReactElement {
   const { t } = useI18n();
@@ -157,6 +168,20 @@ export function SettingsPage({
       </div>
 
       <div className="card card-section">
+        <span className="section-title">
+          <DownloadIcon size={12} /> {t('data.title')}
+        </span>
+        <p className="settings-hint">{t('data.hint')}</p>
+        <ActionButtons
+          exporting={exporting}
+          importing={importing}
+          onExport={onExport}
+          onImportReplace={onImportReplace}
+          onImportMerge={onImportMerge}
+        />
+      </div>
+
+      <div className="card card-section">
         <span className="section-title">{t('settings.dangerZone')}</span>
         <button
           className="action-btn action-btn--danger"
@@ -164,11 +189,11 @@ export function SettingsPage({
           disabled={resetting}
           onClick={handleResetClick}
         >
-          {resetting ? t('settings.resetting') : (<><RotateCcwIcon size={12} /> {t('settings.resetStats')}</>)}
+          {resetting ? t('settings.resetting') : (<><RotateCcwIcon size={12} /> {t('settings.resetApp')}</>)}
         </button>
         {confirmingReset && (
-          <div className="reset-confirm" role="alertdialog" aria-label={t('settings.resetStats')}>
-            <p className="reset-confirm__message">{t('data.confirmReset')}</p>
+          <div className="reset-confirm" role="alertdialog" aria-label={t('settings.resetApp')}>
+            <p className="reset-confirm__message">{t('settings.confirmResetApp')}</p>
             <div className="reset-confirm__actions">
               <button
                 type="button"

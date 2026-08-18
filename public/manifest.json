@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Keep video playback speed fixed across popular video websites and custom domains.",
 
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
 
   "action": {
     "default_popup": "popup/index.html",

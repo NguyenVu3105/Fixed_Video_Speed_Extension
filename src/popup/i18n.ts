@@ -15,7 +15,6 @@ const en = {
   'nav.sites': 'Sites',
   'nav.statistics': 'Statistics',
   'nav.settings': 'Settings',
-  'nav.data': 'Import / Export',
 
   // Loading
   'loading.settings': 'Loading settings',
@@ -93,7 +92,9 @@ const en = {
   'settings.profileHint':
     'Assign a profile to a website from the Dashboard to reuse its speed.',
   'settings.dangerZone': 'Danger zone',
-  'settings.resetStats': 'Reset statistics',
+  'settings.resetApp': 'Reset app',
+  'settings.confirmResetApp':
+    'This restores all settings to their defaults and permanently deletes all statistics (watched time, sessions, history). Continue?',
   'settings.resetting': 'Resetting…',
 
   // Data page
@@ -103,14 +104,10 @@ const en = {
   'data.replace': 'Replace',
   'data.merge': 'Merge',
   'data.export': 'Export',
-  'data.reset': 'Reset',
   'data.importing': 'Importing…',
   'data.exporting': 'Exporting…',
-  'data.resetting': 'Resetting…',
   'data.importMode.replace': 'replace',
   'data.importMode.merge': 'merge',
-  'data.confirmReset':
-    'This permanently deletes all statistics (watched time, sessions, history). Continue?',
   'data.confirmYes': 'Yes, reset',
   'data.confirmNo': 'Cancel',
 
@@ -127,7 +124,7 @@ const en = {
   'status.importFailed': 'Import failed: {error}',
   'status.importDone':
     'Imported ({mode}) — {sessions} sessions, {watched} watched, {saved} saved.',
-  'status.statsReset': 'Statistics reset.',
+  'status.appReset': 'App reset to defaults.',
   'status.resetFailed': 'Reset failed: {error}',
 
   // Duration units
@@ -148,7 +145,6 @@ const vi: Record<TranslationKey, string> = {
   'nav.sites': 'Trang web',
   'nav.statistics': 'Thống kê',
   'nav.settings': 'Cài đặt',
-  'nav.data': 'Nhập / Xuất',
 
   // Loading
   'loading.settings': 'Đang tải cài đặt',
@@ -228,7 +224,9 @@ const vi: Record<TranslationKey, string> = {
   'settings.profileHint':
     'Gán hồ sơ cho một trang web từ Bảng điều khiển để dùng lại tốc độ của nó.',
   'settings.dangerZone': 'Vùng nguy hiểm',
-  'settings.resetStats': 'Đặt lại thống kê',
+  'settings.resetApp': 'Đặt lại ứng dụng',
+  'settings.confirmResetApp':
+    'Thao tác này khôi phục toàn bộ cài đặt về mặc định và xóa vĩnh viễn toàn bộ thống kê (thời gian xem, phiên, lịch sử). Tiếp tục?',
   'settings.resetting': 'Đang đặt lại…',
 
   // Data page
@@ -238,14 +236,10 @@ const vi: Record<TranslationKey, string> = {
   'data.replace': 'Thay thế',
   'data.merge': 'Trộn',
   'data.export': 'Xuất',
-  'data.reset': 'Đặt lại',
   'data.importing': 'Đang nhập…',
   'data.exporting': 'Đang xuất…',
-  'data.resetting': 'Đang đặt lại…',
   'data.importMode.replace': 'thay thế',
   'data.importMode.merge': 'trộn',
-  'data.confirmReset':
-    'Thao tác này xóa vĩnh viễn toàn bộ thống kê (thời gian xem, phiên, lịch sử). Tiếp tục?',
   'data.confirmYes': 'Có, đặt lại',
   'data.confirmNo': 'Hủy',
 
@@ -262,7 +256,7 @@ const vi: Record<TranslationKey, string> = {
   'status.importFailed': 'Nhập thất bại: {error}',
   'status.importDone':
     'Đã nhập ({mode}) — {sessions} phiên, đã xem {watched}, tiết kiệm {saved}.',
-  'status.statsReset': 'Đã đặt lại thống kê.',
+  'status.appReset': 'Đã đặt lại ứng dụng về mặc định.',
   'status.resetFailed': 'Đặt lại thất bại: {error}',
 
   // Duration units

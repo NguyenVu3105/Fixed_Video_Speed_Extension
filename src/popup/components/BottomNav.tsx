@@ -3,20 +3,18 @@ import { useI18n } from '../i18n';
 import type { TranslationKey } from '../i18n';
 import {
   BarChartIcon,
-  DownloadIcon,
   GlobeIcon,
   HomeIcon,
   SlidersIcon,
 } from './icons';
 
-export type TabId = 'dashboard' | 'sites' | 'statistics' | 'settings' | 'data';
+export type TabId = 'dashboard' | 'sites' | 'statistics' | 'settings';
 
 const TABS: readonly { id: TabId; labelKey: TranslationKey; icon: (size: number) => ReactElement }[] = [
   { id: 'dashboard', labelKey: 'nav.dashboard', icon: (size) => <HomeIcon size={size} /> },
   { id: 'sites', labelKey: 'nav.sites', icon: (size) => <GlobeIcon size={size} /> },
   { id: 'statistics', labelKey: 'nav.statistics', icon: (size) => <BarChartIcon size={size} /> },
   { id: 'settings', labelKey: 'nav.settings', icon: (size) => <SlidersIcon size={size} /> },
-  { id: 'data', labelKey: 'nav.data', icon: (size) => <DownloadIcon size={size} /> },
 ];
 
 interface BottomNavProps {

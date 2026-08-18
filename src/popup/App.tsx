@@ -16,7 +16,6 @@ import { DashboardTab } from "./components/DashboardTab";
 import { SitesPage } from "./components/SitesPage";
 import { StatisticsPage } from "./components/StatisticsPage";
 import { SettingsPage } from "./components/SettingsPage";
-import { DataPage } from "./components/DataPage";
 import type { CurrentSite } from "./utils/currentSite";
 import { getCurrentSite } from "./utils/currentSite";
 import { findCustomSite, getSiteDefinition, normalizeCustomDomain } from "../services/sites";
@@ -442,7 +441,7 @@ export function App(): ReactElement {
     triggerFilePicker("merge");
   }, [triggerFilePicker]);
 
-  // Reset statistics, then refresh the displayed summary immediately.
+  // Reset the whole app: restore default settings AND wipe all statistics.
   // Playing tabs flush first so their stale snapshots cannot resurrect the
   // deleted data afterwards.
   const handleReset = useCallback(async () => {
@@ -452,10 +451,13 @@ export function App(): ReactElement {
     showStatus(null, false);
     try {
       await flushStatsInAllTabs();
+      const saveResult = await StorageService.saveSettings(DEFAULT_SETTINGS);
+      if (!saveResult.ok) throw new Error(saveResult.error);
       await StatisticsService.resetStatistics();
+      setSettings(DEFAULT_SETTINGS);
       const s: StatisticsSummary = await StatisticsService.getSummary();
       setSummary(s);
-      showStatus(t('status.statsReset'), false);
+      showStatus(t('status.appReset'), false);
     } catch (err) {
       setSummary(null);
       const m = err instanceof Error ? err.message : String(err);
@@ -558,6 +560,8 @@ export function App(): ReactElement {
         {activeTab === "settings" && (
           <SettingsPage
             settings={settings}
+            exporting={exporting}
+            importing={importing}
             resetting={resetting}
             onToggleEnabled={handleToggleEnabled}
             onToggleOverlay={handleToggleOverlay}
@@ -566,14 +570,6 @@ export function App(): ReactElement {
             onRenameProfile={handleRenameProfile}
             onChangeProfileSpeed={handleProfileSpeedChange}
             onRemoveProfile={handleRemoveProfile}
-            onReset={() => { void handleReset(); }}
-          />
-        )}
-        {activeTab === "data" && (
-          <DataPage
-            exporting={exporting}
-            importing={importing}
-            resetting={resetting}
             onExport={() => { void handleExport(); }}
             onImportReplace={handleImportReplace}
             onImportMerge={handleImportMerge}
