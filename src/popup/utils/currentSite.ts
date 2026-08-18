@@ -2,14 +2,12 @@ import type { Settings, SiteType } from '../../types';
 import {
   detectSiteFromHost,
   findCustomSite,
-  getSiteLabel,
   isHostSupported,
 } from '../../services/sites';
 
 export interface CurrentSite {
   readonly hostname: string;
   readonly site: SiteType;
-  readonly label: string;
   readonly supported: boolean;
   readonly custom: boolean;
   readonly favIconUrl: string | null;
@@ -30,7 +28,6 @@ export async function getCurrentSite(settings: Settings): Promise<CurrentSite | 
     return {
       hostname: parsed.hostname,
       site,
-      label: customSite === null ? getSiteLabel(site) : 'Custom site',
       supported: isHostSupported(parsed.hostname, settings.customSites),
       custom: customSite !== null && site === 'other',
       favIconUrl: tabs[0]?.favIconUrl ?? null,

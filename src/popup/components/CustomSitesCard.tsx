@@ -1,19 +1,15 @@
 import { useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 import type { CustomSite } from '../../types';
-import { SPEED_MAX, SPEED_MIN, SPEED_STEP } from '../constants';
 import { useI18n } from '../i18n';
 import { GlobeIcon, XIcon } from './icons';
+import { SpeedNumberInput } from './SpeedNumberInput';
 
 interface CustomSitesCardProps {
   readonly sites: readonly CustomSite[];
   readonly onAdd: (domain: string) => void;
   readonly onChangeSpeed: (domain: string, speed: number) => void;
   readonly onRemove: (domain: string) => void;
-}
-
-function clampSpeed(value: number): number {
-  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, value));
 }
 
 export function CustomSitesCard({
@@ -61,17 +57,10 @@ export function CustomSitesCard({
             <div className="custom-site-row" key={site.domain}>
               <span className="custom-site-row__domain" title={site.domain}>{site.domain}</span>
               <label className="custom-site-row__speed">
-                <input
-                  type="number"
-                  min={SPEED_MIN}
-                  max={SPEED_MAX}
-                  step={SPEED_STEP}
+                <SpeedNumberInput
                   value={site.speed}
-                  aria-label={t('sites.speedFor', { site: site.domain })}
-                  onChange={(event) => {
-                    const value = event.target.valueAsNumber;
-                    if (Number.isFinite(value)) onChangeSpeed(site.domain, clampSpeed(value));
-                  }}
+                  ariaLabel={t('sites.speedFor', { site: site.domain })}
+                  onCommit={(speed) => { onChangeSpeed(site.domain, speed); }}
                 />
               </label>
               <button

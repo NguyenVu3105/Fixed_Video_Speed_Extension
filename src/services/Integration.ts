@@ -15,10 +15,17 @@ let unsubscribeStorage: (() => void) | null = null;
 let unsubscribePlayback: (() => void) | null = null;
 let latestSettings: Settings | null = null;
 let lifecycleVersion = 0;
+/** Consecutive failed boot attempts; bounds the storage-error retry loop. */
+let bootRetries = 0;
+const MAX_BOOT_RETRIES = 5;
 const currentHost = normalizeHostname(window.location.hostname);
 
 function shouldRun(settings: Settings): boolean {
-  return isHostSupported(currentHost, settings.customSites);
+  return isHostSupported(
+    currentHost,
+    settings.customSites,
+    settings.supportedSites,
+  );
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -111,16 +118,29 @@ async function start(): Promise<void> {
   if (startPromise !== null) return startPromise;
 
   ensureSettingsSubscription();
+  // Observe external statistics writes (import/reset in the popup, other
+  // contexts) regardless of whether enforcement runs here — otherwise a
+  // playing tab's stale cache can silently undo an import or reset.
+  StatisticsService.init();
   const version = ++lifecycleVersion;
 
   startPromise = (async () => {
     const result = await StorageService.getSettings();
 
-    if (!result.ok || version !== lifecycleVersion) return;
+    if (version !== lifecycleVersion) return;
 
     // A storage event may have arrived while getSettings() was pending. Use
-    // that newer snapshot instead of resurrecting a stale enabled state.
-    const settings = latestSettings ?? result.value;
+    // that newer snapshot instead of resurrecting a stale enabled state; it
+    // also covers a failed storage read.
+    const settings = latestSettings ?? (result.ok ? result.value : null);
+    if (settings === null) {
+      // Storage read failed and no fresher snapshot arrived. The next
+      // settings change retries the boot; bound the attempts so a
+      // permanently failing read cannot churn forever.
+      if (bootRetries < MAX_BOOT_RETRIES) bootRetries += 1;
+      return;
+    }
+    bootRetries = 0;
     latestSettings = settings;
 
     if (!settings.extensionEnabled || !shouldRun(settings)) {
@@ -142,6 +162,7 @@ async function start(): Promise<void> {
     // An enable event can arrive while a cancelled startup is unwinding.
     if (
       !running &&
+      bootRetries < MAX_BOOT_RETRIES &&
       latestSettings?.extensionEnabled === true &&
       shouldRun(latestSettings)
     ) {
@@ -188,7 +209,9 @@ function stop(): void {
   teardown(false);
   unsubscribeStorage?.();
   unsubscribeStorage = null;
+  StatisticsService.stop();
   latestSettings = null;
+  bootRetries = 0;
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────

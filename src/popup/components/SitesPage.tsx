@@ -1,9 +1,9 @@
 import type { ReactElement } from "react";
 import type { Settings, SiteType } from "../../types";
 import { SITE_DEFINITIONS } from "../../services/sites";
-import { SPEED_MAX, SPEED_MIN, SPEED_STEP } from "../constants";
 import { useI18n } from "../i18n";
 import { CustomSitesCard } from "./CustomSitesCard";
+import { SpeedNumberInput } from "./SpeedNumberInput";
 import { GlobeIcon, XIcon } from "./icons";
 
 interface SitesPageProps {
@@ -13,10 +13,6 @@ interface SitesPageProps {
   readonly onAddCustomSite: (domain: string) => void;
   readonly onChangeCustomSpeed: (domain: string, speed: number) => void;
   readonly onRemoveCustomSite: (domain: string) => void;
-}
-
-function clampSpeed(value: number): number {
-  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, value));
 }
 
 export function SitesPage({
@@ -44,19 +40,10 @@ export function SitesPage({
                 </span>
               </div>
               <label className="site-row__speed">
-                <input
-                  type="number"
-                  min={SPEED_MIN}
-                  max={SPEED_MAX}
-                  step={SPEED_STEP}
+                <SpeedNumberInput
                   value={settings.siteSpeeds[definition.type]}
-                  aria-label={t('sites.speedFor', { site: definition.label })}
-                  onChange={(event) => {
-                    const value = event.target.valueAsNumber;
-                    if (Number.isFinite(value)) {
-                      onChangeSiteSpeed(definition.type, clampSpeed(value));
-                    }
-                  }}
+                  ariaLabel={t('sites.speedFor', { site: definition.label })}
+                  onCommit={(speed) => { onChangeSiteSpeed(definition.type, speed); }}
                 />
               </label>
               <button

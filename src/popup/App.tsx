@@ -22,6 +22,8 @@ import { getCurrentSite } from "./utils/currentSite";
 import { findCustomSite, getSiteDefinition, normalizeCustomDomain } from "../services/sites";
 import { findProfile, getSiteSpeed } from "../services/siteSettings";
 import { useContentState } from "./hooks/useContentState";
+import { flushStatsInAllTabs } from "./utils/tabMessaging";
+import { SPEED_MAX, SPEED_MIN } from "../config";
 
 // ─── Loading State ────────────────────────────────────────────────────────────
 
@@ -153,30 +155,29 @@ export function App(): ReactElement {
   // ── Save helper (deduplicates unchanged fields) ───────────────────────────
 
   const save = useCallback((patch: Partial<Settings>) => {
-    setSettings((prev: Settings | null) => {
-      if (prev === null) return prev;
-      const next: Settings = { ...prev, ...patch };
-      // Deduplicate: skip save if nothing actually changed
-      const changed = (Object.keys(patch) as (keyof Settings)[]).some(
-        (key) => patch[key] !== prev[key],
-      );
-      if (!changed) return prev;
-      // Persist and report any failure to the UI
-      void StorageService.saveSettings(next)
-        .then((r) => {
-          if (!r.ok) {
-            setStatusMessage(t('status.saveFailed', { error: r.error }));
-            setStatusError(true);
-          }
-        })
-        .catch((err) => {
-          const m = err instanceof Error ? err.message : String(err);
-          setStatusMessage(t('status.saveFailed', { error: m }));
+    if (settings === null) return;
+    // Deduplicate: skip save if nothing actually changed
+    const changed = (Object.keys(patch) as (keyof Settings)[]).some(
+      (key) => patch[key] !== settings[key],
+    );
+    if (!changed) return;
+    // Compute the next settings OUTSIDE the setState updater — side effects
+    // inside an updater run twice under StrictMode and would double-write.
+    const next: Settings = { ...settings, ...patch };
+    setSettings(next);
+    void StorageService.saveSettings(next)
+      .then((r) => {
+        if (!r.ok) {
+          setStatusMessage(t('status.saveFailed', { error: r.error }));
           setStatusError(true);
-        });
-      return next;
-    });
-  }, [t]);
+        }
+      })
+      .catch((err) => {
+        const m = err instanceof Error ? err.message : String(err);
+        setStatusMessage(t('status.saveFailed', { error: m }));
+        setStatusError(true);
+      });
+  }, [settings, t]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -204,39 +205,39 @@ export function App(): ReactElement {
   /**
    * Persists a new speed for the current site immediately. The content script
    * picks the change up through its storage subscription — no apply step.
+   *
+   * `profileId` carries the profile the user explicitly chose (or null for a
+   * manual speed). It is stored as-is instead of being re-derived from the
+   * speed value — two profiles can share one speed, and guessing the profile
+   * back from the number would always pick the first match.
    */
-  const handleSpeedChange = useCallback(
-    (nextSpeed: number) => {
+  const applySpeed = useCallback(
+    (nextSpeed: number, profileId: string | null) => {
       if (settings === null || currentSite === null) return;
       if (currentSite.supported !== true) return;
       setSpeed(nextSpeed);
-
-      // Keep the profile dropdown in sync: a speed matching a profile selects
-      // it; anything else falls back to "Custom".
-      const matching = settings.profiles.find((p) => p.speed === nextSpeed);
-      const assignId = matching !== undefined ? matching.id : null;
-      setSelectedProfileId(assignId);
+      setSelectedProfileId(profileId);
 
       if (currentSite.custom) {
         const customSite = findCustomSite(currentSite.hostname, settings.customSites);
         if (customSite === null) return;
-        if (customSite.speed === nextSpeed && (customSite.profileId ?? null) === assignId) return;
+        if (customSite.speed === nextSpeed && (customSite.profileId ?? null) === profileId) return;
         save({
           customSites: settings.customSites.map((site) =>
             site.domain === customSite.domain
-              ? { ...site, speed: nextSpeed, profileId: assignId }
+              ? { ...site, speed: nextSpeed, profileId }
               : site,
           ),
         });
         return;
       }
       const previousAssign = settings.siteProfiles[currentSite.site] ?? null;
-      if (settings.siteSpeeds[currentSite.site] === nextSpeed && previousAssign === assignId) return;
+      if (settings.siteSpeeds[currentSite.site] === nextSpeed && previousAssign === profileId) return;
       const siteProfiles = { ...settings.siteProfiles };
-      if (assignId === null) {
+      if (profileId === null) {
         delete siteProfiles[currentSite.site];
       } else {
-        siteProfiles[currentSite.site] = assignId;
+        siteProfiles[currentSite.site] = profileId;
       }
       save({
         siteSpeeds: {
@@ -249,14 +250,22 @@ export function App(): ReactElement {
     [currentSite, save, settings],
   );
 
+  /** Manual speed change (dial, presets, custom input) — no profile selected. */
+  const handleSpeedChange = useCallback(
+    (nextSpeed: number) => {
+      applySpeed(nextSpeed, null);
+    },
+    [applySpeed],
+  );
+
   const handleSelectProfile = useCallback(
     (profileId: string | null) => {
       setSelectedProfileId(profileId);
       if (settings === null || profileId === null) return;
       const profile = findProfile(settings.profiles, profileId);
-      if (profile !== null) handleSpeedChange(profile.speed);
+      if (profile !== null) applySpeed(profile.speed, profileId);
     },
-    [handleSpeedChange, settings],
+    [applySpeed, settings],
   );
 
   const handleSiteSpeedChange = useCallback(
@@ -290,6 +299,11 @@ export function App(): ReactElement {
     setStatusMessage(message);
     setStatusError(isError);
   }, []);
+
+  /** Shown when a typed speed was clamped into the allowed range. */
+  const handleSpeedClamped = useCallback(() => {
+    showStatus(t('status.clamped', { min: SPEED_MIN, max: SPEED_MAX }), false);
+  }, [showStatus, t]);
 
   const handleAddCustomSite = useCallback(
     (input: string) => {
@@ -340,11 +354,11 @@ export function App(): ReactElement {
     if (settings === null) return;
     const profile = {
       id: crypto.randomUUID(),
-      name: `Profile ${String(settings.profiles.length + 1)}`,
+      name: t('profile.defaultName', { n: settings.profiles.length + 1 }),
       speed: 1,
     };
     save({ profiles: [...settings.profiles, profile] });
-  }, [save, settings]);
+  }, [save, settings, t]);
 
   const handleRenameProfile = useCallback(
     (id: string, name: string) => {
@@ -403,7 +417,9 @@ export function App(): ReactElement {
       a.href = url;
       a.download = getExportFilename();
       a.click();
-      URL.revokeObjectURL(url);
+      // Revoking synchronously can cancel the download in some browsers;
+      // give the click a moment before releasing the blob URL.
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       showStatus(t('status.exportDone'), false);
     } catch (err) {
       const m = err instanceof Error ? err.message : String(err);
@@ -427,12 +443,15 @@ export function App(): ReactElement {
   }, [triggerFilePicker]);
 
   // Reset statistics, then refresh the displayed summary immediately.
+  // Playing tabs flush first so their stale snapshots cannot resurrect the
+  // deleted data afterwards.
   const handleReset = useCallback(async () => {
     if (resettingRef.current) return;
     resettingRef.current = true;
     setResetting(true);
     showStatus(null, false);
     try {
+      await flushStatsInAllTabs();
       await StatisticsService.resetStatistics();
       const s: StatisticsSummary = await StatisticsService.getSummary();
       setSummary(s);
@@ -466,7 +485,11 @@ export function App(): ReactElement {
           const { total } = await StatisticsService.exportStatistics();
           showStatus(
             t('status.importDone', {
-              mode: importModeRef.current,
+              mode: t(
+                importModeRef.current === 'replace'
+                  ? 'data.importMode.replace'
+                  : 'data.importMode.merge',
+              ),
               sessions: total.sessionCount,
               watched: formatDuration(total.watchedSeconds),
               saved: formatDuration(total.savedSeconds),
@@ -498,6 +521,14 @@ export function App(): ReactElement {
     <div className="app">
       <Header enabled={settings.extensionEnabled} />
       <main className="app__content">
+        {statusMessage !== null && (
+          <p
+            role={statusError ? 'alert' : 'status'}
+            className={`status-message status-message--global${statusError ? ' status-message--error' : ' status-message--ok'}`}
+          >
+            {statusMessage}
+          </p>
+        )}
         {activeTab === "dashboard" && (
           <DashboardTab
             settings={settings}
@@ -510,6 +541,7 @@ export function App(): ReactElement {
             onSpeedChange={handleSpeedChange}
             onSelectProfile={handleSelectProfile}
             onAddDomain={handleAddCustomSite}
+            onSpeedClamped={handleSpeedClamped}
           />
         )}
         {activeTab === "sites" && (
@@ -542,8 +574,6 @@ export function App(): ReactElement {
             exporting={exporting}
             importing={importing}
             resetting={resetting}
-            statusMessage={statusMessage}
-            statusError={statusError}
             onExport={() => { void handleExport(); }}
             onImportReplace={handleImportReplace}
             onImportMerge={handleImportMerge}

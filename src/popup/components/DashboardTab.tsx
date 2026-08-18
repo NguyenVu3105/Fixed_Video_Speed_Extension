@@ -20,6 +20,7 @@ interface DashboardTabProps {
   readonly onSpeedChange: (speed: number) => void;
   readonly onSelectProfile: (profileId: string | null) => void;
   readonly onAddDomain: (domain: string) => void;
+  readonly onSpeedClamped: () => void;
 }
 
 export function DashboardTab({
@@ -33,6 +34,7 @@ export function DashboardTab({
   onSpeedChange,
   onSelectProfile,
   onAddDomain,
+  onSpeedClamped,
 }: DashboardTabProps): ReactElement {
   const { t } = useI18n();
   const siteSupported = currentSite?.supported === true && !currentSiteLoading;
@@ -52,7 +54,7 @@ export function DashboardTab({
         onAddDomain={onAddDomain}
       />
       <div className="card card-section">
-        <SpeedController speed={speed} onSpeedChange={onSpeedChange} />
+        <SpeedController speed={speed} onSpeedChange={onSpeedChange} onClamped={onSpeedClamped} />
         <SpeedDial speed={speed} onChange={onSpeedChange} />
         <QuickSpeedButtons
           activeSpeed={speed}

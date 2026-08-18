@@ -14,15 +14,9 @@ export default defineConfig({
       input: {
         // Popup HTML entry — outputs to dist/popup/index.html (matches manifest)
         popup: resolve(import.meta.dirname, 'popup/index.html'),
-        // Background service worker
-        background: resolve(import.meta.dirname, 'src/background/background.ts'),
       },
       output: {
-        // Route each entry to its correct folder in dist/
-        entryFileNames: (chunk) => {
-          if (chunk.name === 'background') return 'background/background.js';
-          return 'popup/[name]-[hash].js';
-        },
+        entryFileNames: 'popup/[name]-[hash].js',
         chunkFileNames: 'popup/chunks/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
       },

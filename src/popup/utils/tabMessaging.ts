@@ -1,5 +1,7 @@
 import type { PopupToContentMessage } from '../../types/messages';
 
+export { flushStatsInAllTabs } from '../../services/tabs';
+
 /** Returns the active http(s) tab, or null when none is available. */
 export async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
   try {

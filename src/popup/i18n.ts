@@ -36,6 +36,10 @@ const en = {
   'profile.label': 'Profile',
   'profile.hint': 'Speed preset for this site',
   'profile.custom': 'Custom',
+  'profile.defaultName': 'Profile {n}',
+  'profile.nameLabel': 'Name of profile {name}',
+  'profile.speedLabel': 'Speed of profile {name}',
+  'profile.removeLabel': 'Remove profile {name}',
 
   // Speed controls
   'speed.current': 'Current Speed',
@@ -66,6 +70,7 @@ const en = {
   'sites.domainLabel': 'Custom website domain',
   'sites.add': 'Add',
   'sites.empty': 'No custom domains yet.',
+  'sites.customSiteLabel': 'Custom site',
 
   // Statistics page
   'statistics.breakdown': 'Breakdown',
@@ -102,9 +107,16 @@ const en = {
   'data.importing': 'Importing…',
   'data.exporting': 'Exporting…',
   'data.resetting': 'Resetting…',
+  'data.importMode.replace': 'replace',
+  'data.importMode.merge': 'merge',
+  'data.confirmReset':
+    'This permanently deletes all statistics (watched time, sessions, history). Continue?',
+  'data.confirmYes': 'Yes, reset',
+  'data.confirmNo': 'Cancel',
 
   // Status messages
   'status.saveFailed': 'Save failed: {error}',
+  'status.clamped': 'Speed adjusted to the allowed range ({min}x–{max}x).',
   'status.invalidDomain': 'Enter a valid domain, such as example.com.',
   'status.alreadySupported': 'This website is already supported automatically.',
   'status.alreadyAdded': 'This domain is already in your custom sites.',
@@ -157,6 +169,10 @@ const vi: Record<TranslationKey, string> = {
   'profile.label': 'Hồ sơ',
   'profile.hint': 'Tốc độ mẫu cho trang này',
   'profile.custom': 'Tùy chỉnh',
+  'profile.defaultName': 'Hồ sơ {n}',
+  'profile.nameLabel': 'Tên của hồ sơ {name}',
+  'profile.speedLabel': 'Tốc độ của hồ sơ {name}',
+  'profile.removeLabel': 'Xóa hồ sơ {name}',
 
   // Speed controls
   'speed.current': 'Tốc độ hiện tại',
@@ -189,6 +205,7 @@ const vi: Record<TranslationKey, string> = {
   'sites.domainLabel': 'Tên miền trang web tùy chỉnh',
   'sites.add': 'Thêm',
   'sites.empty': 'Chưa có tên miền tùy chỉnh nào.',
+  'sites.customSiteLabel': 'Trang tùy chỉnh',
 
   // Statistics page
   'statistics.breakdown': 'Chi tiết',
@@ -225,9 +242,16 @@ const vi: Record<TranslationKey, string> = {
   'data.importing': 'Đang nhập…',
   'data.exporting': 'Đang xuất…',
   'data.resetting': 'Đang đặt lại…',
+  'data.importMode.replace': 'thay thế',
+  'data.importMode.merge': 'trộn',
+  'data.confirmReset':
+    'Thao tác này xóa vĩnh viễn toàn bộ thống kê (thời gian xem, phiên, lịch sử). Tiếp tục?',
+  'data.confirmYes': 'Có, đặt lại',
+  'data.confirmNo': 'Hủy',
 
   // Status messages
   'status.saveFailed': 'Lưu thất bại: {error}',
+  'status.clamped': 'Tốc độ đã được chỉnh về khoảng cho phép ({min}x–{max}x).',
   'status.invalidDomain': 'Nhập tên miền hợp lệ, ví dụ example.com.',
   'status.alreadySupported': 'Trang web này đã được hỗ trợ tự động.',
   'status.alreadyAdded': 'Tên miền này đã có trong danh sách tùy chỉnh.',

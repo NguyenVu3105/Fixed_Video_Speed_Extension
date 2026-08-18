@@ -866,6 +866,35 @@ body {
   color: var(--color-danger);
 }
 
+/* Global status banner shown above every tab's content. */
+.status-message--global {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Inline confirmation for destructive actions (statistics reset). */
+.reset-confirm {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.06);
+}
+
+.reset-confirm__message {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.reset-confirm__actions {
+  display: flex;
+  gap: 6px;
+}
+
 /* ─── Sites List ────────────────────────────────────────────────────────────── */
 .site-list {
   display: flex;

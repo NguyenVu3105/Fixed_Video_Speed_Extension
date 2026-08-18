@@ -1,5 +1,3 @@
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 /** Callback invoked once per unique HTMLVideoElement detected in the DOM. */
 export type VideoFoundCallback = (video: HTMLVideoElement) => void;
 
@@ -14,6 +12,12 @@ let onVideoRemoved: VideoRemovedCallback | null = null;
 // A Set is intentional here: unlike WeakSet, it can forget a removed video so
 // the same DOM element can be detected again if a SPA reuses it later.
 const seen = new Set<HTMLVideoElement>();
+/**
+ * MutationObservers watching inside shadow roots. The document-level observer
+ * cannot see mutations that happen beneath a shadow boundary, so each shadow
+ * root encountered while scanning gets its own observer.
+ */
+const shadowObservers = new Map<ShadowRoot, MutationObserver>();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -28,17 +32,51 @@ function processNode(node: Node): void {
 }
 
 /**
- * Scans the subtree rooted at `root` for any HTMLVideoElement nodes.
+ * Attaches a MutationObserver inside `root` so video additions/removals
+ * beneath the shadow boundary are detected too. Idempotent per root.
+ */
+function observeShadowRoot(root: ShadowRoot): void {
+  if (shadowObservers.has(root) || observer === null) return;
+  const shadowObserver = new MutationObserver(handleMutations);
+  shadowObserver.observe(root, { childList: true, subtree: true });
+  shadowObservers.set(root, shadowObserver);
+}
+
+/**
+ * Scans a container (Element or ShadowRoot) for videos and recurses into
+ * any open shadow roots found inside it.
+ */
+function scanContainer(container: Element | ShadowRoot): void {
+  const videos = container.querySelectorAll('video');
+  for (const v of videos) {
+    processNode(v);
+  }
+  const candidates = container.querySelectorAll('*');
+  for (const el of candidates) {
+    if (el.shadowRoot !== null) {
+      observeShadowRoot(el.shadowRoot);
+      scanSubtree(el.shadowRoot);
+    }
+  }
+}
+
+/**
+ * Scans the subtree rooted at `root` for any HTMLVideoElement nodes,
+ * recursing into open shadow roots (players embedded in web components
+ * are invisible to a document-level querySelectorAll).
  */
 function scanSubtree(root: Node): void {
   if (root instanceof HTMLVideoElement) {
     processNode(root);
   }
   if (root instanceof Element) {
-    const videos = root.querySelectorAll('video');
-    for (const v of videos) {
-      processNode(v);
+    if (root.shadowRoot !== null) {
+      observeShadowRoot(root.shadowRoot);
+      scanSubtree(root.shadowRoot);
     }
+    scanContainer(root);
+  } else if (root instanceof ShadowRoot) {
+    scanContainer(root);
   }
 }
 
@@ -52,7 +90,7 @@ function scanRemovedSubtree(root: Node): void {
   if (root instanceof HTMLVideoElement) {
     videos.push(root);
   }
-  if (root instanceof Element) {
+  if (root instanceof Element || root instanceof ShadowRoot) {
     videos.push(...root.querySelectorAll('video'));
   }
 
@@ -64,7 +102,8 @@ function scanRemovedSubtree(root: Node): void {
 }
 
 /**
- * MutationObserver callback. Handles added nodes and subtree mutations.
+ * MutationObserver callback (document-level and per-shadow-root).
+ * Handles added nodes and subtree mutations.
  */
 function handleMutations(mutations: MutationRecord[]): void {
   for (const mutation of mutations) {
@@ -108,6 +147,10 @@ function start(cb: VideoFoundCallback, onRemoved?: VideoRemovedCallback): void {
 function stop(): void {
   observer?.disconnect();
   observer = null;
+  for (const shadowObserver of shadowObservers.values()) {
+    shadowObserver.disconnect();
+  }
+  shadowObservers.clear();
   onVideoFound = null;
   onVideoRemoved = null;
   seen.clear();

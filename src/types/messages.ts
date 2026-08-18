@@ -28,4 +28,17 @@ export interface ApplyMessage {
   speed: number;
 }
 
-export type PopupToContentMessage = GetStateMessage | PreviewMessage | ApplyMessage;
+/**
+ * Flushes accrued statistics deltas to storage and re-reads the canonical
+ * record. Sent to playing tabs before an import/reset so their in-memory
+ * snapshot cannot silently overwrite the just-imported data afterwards.
+ */
+export interface FlushStatsMessage {
+  type: 'fvs:flush-stats';
+}
+
+export type PopupToContentMessage =
+  | GetStateMessage
+  | PreviewMessage
+  | ApplyMessage
+  | FlushStatsMessage;

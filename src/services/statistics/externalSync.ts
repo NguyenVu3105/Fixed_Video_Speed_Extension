@@ -28,9 +28,10 @@ async function loadStatsFromStorage(): Promise<Statistics> {
  *
  * While playback sessions are active, aggregate deltas are persisted as they
  * accrue — reloading mid-session would orphan them. The reload is therefore
- * deferred; once all sessions detach, the next external write adopts the
- * canonical record. The caller commits `next` into its local cache and
- * notifies its subscribers via `onReloaded`.
+ * deferred and `onDeferred` is invoked so the caller can mark itself dirty
+ * and re-sync from storage once the last session ends.
+ * When the reload is committed, `onReloaded` receives the fresh record and
+ * `onReset` rebases any open session accounting (reset writes only).
  */
 export async function synchronizeStatisticsCache(
   activeSessionCount: number,
@@ -38,6 +39,7 @@ export async function synchronizeStatisticsCache(
   next: Statistics,
   onReloaded: (next: Statistics) => void,
   onReset: () => void,
+  onDeferred: () => void,
 ): Promise<void> {
   await writeQueue;
   if (isResetStatistics(next)) {
@@ -45,7 +47,10 @@ export async function synchronizeStatisticsCache(
     onReset();
     return;
   }
-  if (activeSessionCount > 0) return;
+  if (activeSessionCount > 0) {
+    onDeferred();
+    return;
+  }
   const stored = await loadStatsFromStorage();
   onReloaded(stored);
 }

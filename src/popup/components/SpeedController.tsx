@@ -1,42 +1,54 @@
 import { useEffect, useState } from 'react';
-import type { ReactElement } from 'react';
+import type { KeyboardEvent, ReactElement } from 'react';
+import { SPEED_MAX, SPEED_MIN } from '../../config';
 import { useI18n } from '../i18n';
 
 interface SpeedControllerProps {
   readonly speed: number;
   readonly onSpeedChange: (speed: number) => void;
+  /** Called when a typed value was clamped into SPEED_MIN..SPEED_MAX. */
+  readonly onClamped?: () => void;
 }
 
-export function SpeedController({ speed, onSpeedChange }: SpeedControllerProps): ReactElement {
+function clampSpeed(value: number): number {
+  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, value));
+}
+
+export function SpeedController({ speed, onSpeedChange, onClamped }: SpeedControllerProps): ReactElement {
   const { t } = useI18n();
-  // Local text mirrors the current speed. Valid typed values (> 0) are saved
-  // immediately; the text re-syncs from the speed whenever an outside source
-  // (dial, presets, profile) changes it.
+  // Local text mirrors the current speed. Values are committed on blur or
+  // Enter only — committing per keystroke wrote to storage on every digit
+  // and let the storage echo wipe text mid-typing.
   const [text, setText] = useState(speed.toFixed(2));
 
   useEffect(() => {
     setText((prev) => {
       const parsed = Number.parseFloat(prev);
       // Don't clobber what the user is typing while it still matches the speed.
-      if (Number.isFinite(parsed) && parsed > 0 && Math.abs(parsed - speed) < 0.005) {
+      if (Number.isFinite(parsed) && Math.abs(parsed - speed) < 0.005) {
         return prev;
       }
       return speed.toFixed(2);
     });
   }, [speed]);
 
-  const commitText = (value: string): void => {
-    setText(value);
-    const parsed = Number.parseFloat(value);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      onSpeedChange(Math.round(parsed * 100) / 100);
+  const commit = (): void => {
+    const parsed = Number.parseFloat(text);
+    if (!Number.isFinite(parsed)) {
+      setText(speed.toFixed(2));
+      return;
     }
+    const rounded = Math.round(parsed * 100) / 100;
+    const clamped = clampSpeed(rounded);
+    setText(clamped.toFixed(2));
+    if (clamped !== rounded) onClamped?.();
+    if (clamped !== speed) onSpeedChange(clamped);
   };
 
-  const revertIfInvalid = (): void => {
-    const parsed = Number.parseFloat(text);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setText(speed.toFixed(2));
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Enter') {
+      commit();
+      event.currentTarget.blur();
     }
   };
 
@@ -52,12 +64,14 @@ export function SpeedController({ speed, onSpeedChange }: SpeedControllerProps):
       <label className="speed-controller__custom">
         <input
           type="number"
-          min="0.01"
+          min={SPEED_MIN}
+          max={SPEED_MAX}
           step="any"
           value={text}
           aria-label={t('speed.custom')}
-          onChange={(event) => { commitText(event.target.value); }}
-          onBlur={revertIfInvalid}
+          onChange={(event) => { setText(event.target.value); }}
+          onBlur={commit}
+          onKeyDown={handleKeyDown}
         />
         <span className="speed-controller__custom-hint">{t('speed.custom')}</span>
       </label>

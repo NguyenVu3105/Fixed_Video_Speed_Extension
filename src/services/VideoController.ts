@@ -43,6 +43,12 @@ interface AttachedVideo {
   title: string;
   url: string;
   site: SiteType;
+  /**
+   * Re-captures page metadata. SPAs (YouTube et al.) reuse the same
+   * <video> element across videos, so title/url must follow the page,
+   * not the moment of first attach.
+   */
+  refreshMetadata: () => void;
 }
 
 /** Map from video element to its attached entry. */
@@ -156,6 +162,10 @@ function attach(video: HTMLVideoElement): void {
   }
 
   function onPlaybackReady(): void {
+    // A reused element loading a new source is also a new video in a SPA —
+    // refresh metadata here too, since some players swap sources via
+    // MediaSource without touching the src attribute.
+    entry.refreshMetadata();
     enforceSpeed();
   }
 
@@ -228,14 +238,23 @@ function attach(video: HTMLVideoElement): void {
     title: document.title,
     url: window.location.href,
     site: detectSiteFromHost(window.location.hostname),
+    refreshMetadata() {
+      entry.title = document.title;
+      entry.url = window.location.href;
+      entry.site = detectSiteFromHost(window.location.hostname);
+    },
   };
 
   attached.set(video, entry);
 
   // There is no native "sourcechange" event. Watching the src attribute and
   // <source> children catches YouTube/Bilibili source swaps, while the load
-  // events above cover programmatic reloads of the same source.
+  // events above cover programmatic reloads of the same source. A source
+  // swap on a reused element means a new video in a SPA — refresh the
+  // captured metadata so later events (and the session history) carry the
+  // correct title/url instead of the previous video's.
   sourceObserver = new MutationObserver(() => {
+    entry.refreshMetadata();
     enforceSpeed();
   });
   sourceObserver.observe(video, {

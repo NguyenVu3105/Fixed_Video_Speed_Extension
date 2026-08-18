@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ReactElement } from 'react';
 import { useI18n } from '../i18n';
 import { ActionButtons } from './ActionButtons';
@@ -7,8 +8,6 @@ interface DataPageProps {
   readonly exporting: boolean;
   readonly importing: boolean;
   readonly resetting: boolean;
-  readonly statusMessage: string | null;
-  readonly statusError: boolean;
   readonly onExport: () => void;
   readonly onImportReplace: () => void;
   readonly onImportMerge: () => void;
@@ -19,14 +18,24 @@ export function DataPage({
   exporting,
   importing,
   resetting,
-  statusMessage,
-  statusError,
   onExport,
   onImportReplace,
   onImportMerge,
   onReset,
 }: DataPageProps): ReactElement {
   const { t } = useI18n();
+  // Reset deletes everything — require an explicit second click.
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
+  const handleResetClick = (): void => {
+    if (!confirmingReset) {
+      setConfirmingReset(true);
+      return;
+    }
+    setConfirmingReset(false);
+    onReset();
+  };
+
   return (
     <div className="tab-page">
       <div className="card card-section">
@@ -38,12 +47,12 @@ export function DataPage({
           exporting={exporting}
           importing={importing}
           resetting={resetting}
-          statusMessage={statusMessage}
-          statusError={statusError}
+          confirmingReset={confirmingReset}
           onExport={onExport}
           onImportReplace={onImportReplace}
           onImportMerge={onImportMerge}
-          onReset={onReset}
+          onReset={handleResetClick}
+          onCancelReset={() => { setConfirmingReset(false); }}
         />
       </div>
     </div>

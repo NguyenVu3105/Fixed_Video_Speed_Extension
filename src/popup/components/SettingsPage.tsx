@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import type { ReactElement } from 'react';
 import type { Language, Settings, SpeedProfile } from '../../types';
-import { SPEED_MAX, SPEED_MIN, SPEED_STEP } from '../constants';
 import { useI18n } from '../i18n';
 import { ToggleSwitch } from './ToggleSwitch';
+import { SpeedNumberInput } from './SpeedNumberInput';
 import { ChevronDownIcon, EyeIcon, GlobeIcon, PlusIcon, PowerIcon, RotateCcwIcon, XIcon } from './icons';
 
 interface SettingsPageProps {
@@ -18,10 +19,6 @@ interface SettingsPageProps {
   readonly onReset: () => void;
 }
 
-function clampSpeed(value: number): number {
-  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, value));
-}
-
 function ProfileRow({
   profile,
   onRename,
@@ -33,33 +30,27 @@ function ProfileRow({
   readonly onChangeSpeed: (id: string, speed: number) => void;
   readonly onRemove: (id: string) => void;
 }): ReactElement {
+  const { t } = useI18n();
   return (
     <div className="profile-row">
       <input
         className="profile-row__name"
         type="text"
         value={profile.name}
-        aria-label={`Name of profile ${profile.name}`}
+        aria-label={t('profile.nameLabel', { name: profile.name })}
         onChange={(event) => { onRename(profile.id, event.target.value); }}
       />
       <label className="profile-row__speed">
-        <input
-          type="number"
-          min={SPEED_MIN}
-          max={SPEED_MAX}
-          step={SPEED_STEP}
+        <SpeedNumberInput
           value={profile.speed}
-          aria-label={`Speed of profile ${profile.name}`}
-          onChange={(event) => {
-            const value = event.target.valueAsNumber;
-            if (Number.isFinite(value)) onChangeSpeed(profile.id, clampSpeed(value));
-          }}
+          ariaLabel={t('profile.speedLabel', { name: profile.name })}
+          onCommit={(speed) => { onChangeSpeed(profile.id, speed); }}
         />
       </label>
       <button
         className="profile-row__remove"
         type="button"
-        aria-label={`Remove profile ${profile.name}`}
+        aria-label={t('profile.removeLabel', { name: profile.name })}
         onClick={() => { onRemove(profile.id); }}
       >
         <XIcon size={14} />
@@ -81,6 +72,18 @@ export function SettingsPage({
   onReset,
 }: SettingsPageProps): ReactElement {
   const { t } = useI18n();
+  // Reset deletes everything — require an explicit second click.
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
+  const handleResetClick = (): void => {
+    if (!confirmingReset) {
+      setConfirmingReset(true);
+      return;
+    }
+    setConfirmingReset(false);
+    onReset();
+  };
+
   return (
     <div className="tab-page">
       <div className="card card-section">
@@ -159,10 +162,31 @@ export function SettingsPage({
           className="action-btn action-btn--danger"
           type="button"
           disabled={resetting}
-          onClick={onReset}
+          onClick={handleResetClick}
         >
           {resetting ? t('settings.resetting') : (<><RotateCcwIcon size={12} /> {t('settings.resetStats')}</>)}
         </button>
+        {confirmingReset && (
+          <div className="reset-confirm" role="alertdialog" aria-label={t('settings.resetStats')}>
+            <p className="reset-confirm__message">{t('data.confirmReset')}</p>
+            <div className="reset-confirm__actions">
+              <button
+                type="button"
+                className="action-btn action-btn--danger"
+                onClick={handleResetClick}
+              >
+                {t('data.confirmYes')}
+              </button>
+              <button
+                type="button"
+                className="action-btn"
+                onClick={() => { setConfirmingReset(false); }}
+              >
+                {t('data.confirmNo')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

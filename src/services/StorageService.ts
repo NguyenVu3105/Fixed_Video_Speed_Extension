@@ -8,9 +8,18 @@ import type {
   SpeedProfile,
   Statistics,
   StatisticsChangeCallback,
+  PeriodStats,
+  WatchSession,
+  PlaybackSegment,
   Result,
 } from '../types';
-import { DEFAULT_PLAYBACK_SPEED, STATISTICS_STORAGE_KEY } from '../config';
+import {
+  DEFAULT_PLAYBACK_SPEED,
+  MAX_HISTORY_SESSIONS,
+  SPEED_MAX,
+  SPEED_MIN,
+  STATISTICS_STORAGE_KEY,
+} from '../config';
 import { SITE_TYPES, SUPPORTED_SITE_TYPES } from '../types';
 import { getSiteDefinition, normalizeCustomDomain } from './sites';
 
@@ -38,12 +47,6 @@ export const DEFAULT_SETTINGS: Settings = {
   language: 'en',
 };
 
-const DEFAULT_STATISTICS: Statistics = {
-  total: { watchedSeconds: 0, savedSeconds: 0, sessionCount: 0 },
-  daily: {},
-  history: [],
-};
-
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const settingsSubscribers = new Set<SettingsChangeCallback>();
@@ -58,6 +61,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isValidSpeed(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+/** Clamps a valid speed into the enforced SPEED_MIN..SPEED_MAX range. */
+function clampSpeedValue(value: number): number {
+  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, value));
 }
 
 function isSiteType(value: unknown): value is SiteType {
@@ -82,7 +90,7 @@ function normalizeProfiles(value: unknown): SpeedProfile[] {
       continue;
     }
     seen.add(id);
-    normalized.push({ id, name, speed });
+    normalized.push({ id, name, speed: clampSpeedValue(speed) });
   }
   // An empty profile list would leave the dashboard dropdown useless.
   return normalized.length > 0 ? normalized : [...DEFAULT_PROFILES];
@@ -130,7 +138,7 @@ function normalizeCustomSites(
       typeof item['profileId'] === 'string' && validIds.has(item['profileId'])
         ? item['profileId']
         : null;
-    normalized.push({ domain, speed, profileId });
+    normalized.push({ domain, speed: clampSpeedValue(speed), profileId });
   }
   return normalized;
 }
@@ -143,7 +151,7 @@ function normalizeCustomSites(
 export function normalizeSettings(value: unknown): Settings {
   const stored = isRecord(value) ? value : {};
   const legacySpeed = isValidSpeed(stored['playbackSpeed'])
-    ? stored['playbackSpeed']
+    ? clampSpeedValue(stored['playbackSpeed'])
     : DEFAULT_PLAYBACK_SPEED;
   const storedSiteSpeeds = isRecord(stored['siteSpeeds'])
     ? stored['siteSpeeds']
@@ -151,7 +159,9 @@ export function normalizeSettings(value: unknown): Settings {
   const siteSpeeds = Object.fromEntries(
     SITE_TYPES.map((site) => [
       site,
-      isValidSpeed(storedSiteSpeeds[site]) ? storedSiteSpeeds[site] : legacySpeed,
+      isValidSpeed(storedSiteSpeeds[site])
+        ? clampSpeedValue(storedSiteSpeeds[site])
+        : legacySpeed,
     ]),
   ) as Record<SiteType, number>;
   const supportedSites = Array.isArray(stored['supportedSites'])
@@ -185,6 +195,111 @@ export function normalizeSettings(value: unknown): Settings {
     language: isLanguage(stored['language'])
       ? stored['language']
       : DEFAULT_SETTINGS.language,
+  };
+}
+
+// ─── Statistics normalization ────────────────────────────────────────────────
+// Stored data is never trusted raw: a corrupt record (NaN counters, broken
+// segments) would otherwise propagate NaN into every aggregate permanently.
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function normalizePeriodStats(value: unknown): PeriodStats {
+  if (!isRecord(value)) return { watchedSeconds: 0, savedSeconds: 0, sessionCount: 0 };
+  const watched = isFiniteNumber(value['watchedSeconds']) && value['watchedSeconds'] >= 0
+    ? value['watchedSeconds']
+    : 0;
+  const saved = isFiniteNumber(value['savedSeconds']) && value['savedSeconds'] >= 0
+    ? value['savedSeconds']
+    : 0;
+  const count = isFiniteNumber(value['sessionCount']) && value['sessionCount'] >= 0
+    ? Math.floor(value['sessionCount'])
+    : 0;
+  return { watchedSeconds: watched, savedSeconds: saved, sessionCount: count };
+}
+
+function normalizeSegments(value: unknown): PlaybackSegment[] {
+  if (!Array.isArray(value)) return [];
+  const segments: PlaybackSegment[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const speed = isFiniteNumber(item['speed']) && item['speed'] > 0 ? item['speed'] : 1;
+    const seconds = isFiniteNumber(item['seconds']) && item['seconds'] > 0 ? item['seconds'] : null;
+    if (seconds === null) continue;
+    segments.push({ speed, seconds });
+  }
+  return segments;
+}
+
+function normalizeWatchSession(value: unknown): WatchSession | null {
+  if (!isRecord(value)) return null;
+  const id = typeof value['id'] === 'string' && value['id'] !== '' ? value['id'] : null;
+  const startedAt = typeof value['startedAt'] === 'string' && !Number.isNaN(Date.parse(value['startedAt']))
+    ? value['startedAt']
+    : null;
+  if (id === null || startedAt === null) return null;
+  const endedAt = typeof value['endedAt'] === 'string' && !Number.isNaN(Date.parse(value['endedAt']))
+    ? value['endedAt']
+    : null;
+  const segments = normalizeSegments(value['segments']);
+  const watched = isFiniteNumber(value['watchedSeconds']) && value['watchedSeconds'] >= 0
+    ? value['watchedSeconds']
+    : 0;
+  const saved = isFiniteNumber(value['savedSeconds']) && value['savedSeconds'] >= 0
+    ? value['savedSeconds']
+    : 0;
+  const speed = isFiniteNumber(value['playbackSpeed']) && value['playbackSpeed'] > 0
+    ? value['playbackSpeed']
+    : 1;
+  return {
+    id,
+    title: typeof value['title'] === 'string' ? value['title'] : '',
+    url: typeof value['url'] === 'string' ? value['url'] : '',
+    site: isSiteType(value['site']) ? value['site'] : 'other',
+    startedAt,
+    endedAt,
+    playbackSpeed: speed,
+    segments,
+    watchedSeconds: watched,
+    savedSeconds: saved,
+  };
+}
+
+/**
+ * Validates/normalizes a raw statistics record on read. Invalid fields fall
+ * back to safe defaults instead of poisoning aggregates; history is capped
+ * and kept newest-first.
+ */
+export function normalizeStatistics(value: unknown): Statistics {
+  if (!isRecord(value)) {
+    return {
+      total: { watchedSeconds: 0, savedSeconds: 0, sessionCount: 0 },
+      daily: {},
+      history: [],
+    };
+  }
+  const daily: Record<string, PeriodStats> = {};
+  if (isRecord(value['daily'])) {
+    for (const [key, period] of Object.entries(value['daily'])) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+      daily[key] = normalizePeriodStats(period);
+    }
+  }
+  const history: WatchSession[] = [];
+  if (Array.isArray(value['history'])) {
+    for (const item of value['history']) {
+      const session = normalizeWatchSession(item);
+      if (session !== null) history.push(session);
+    }
+  }
+  history.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+  const capped = history.slice(0, MAX_HISTORY_SESSIONS);
+  return {
+    total: normalizePeriodStats(value['total']),
+    daily,
+    history: capped,
   };
 }
 
@@ -288,8 +403,8 @@ function subscribeStatistics(cb: StatisticsChangeCallback): () => void {
 async function getStatistics(): Promise<Result<Statistics>> {
   try {
     const data = await chrome.storage.local.get(STATISTICS_STORAGE_KEY);
-    const stored = data[STATISTICS_STORAGE_KEY] as Statistics | undefined;
-    const statistics: Statistics = stored ?? DEFAULT_STATISTICS;
+    // Validate on read: a corrupt record must not poison aggregates.
+    const statistics = normalizeStatistics(data[STATISTICS_STORAGE_KEY]);
     return { ok: true, value: statistics };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -1,5 +1,4 @@
 import type {
-  PeriodStats,
   Statistics,
   StatisticsChangeCallback,
   StatisticsSummary,
@@ -16,12 +15,28 @@ import {
   finalizeSessionInStatistics,
   roundSeconds,
   sanitizeSpeed,
+  summarizeWeek,
   toDateKey,
 } from "./helpers";
 import {
   attachStatsStorageListener,
   synchronizeStatisticsCache,
 } from "./externalSync";
+
+// ─── Tunables ────────────────────────────────────────────────────────────────
+
+/** How often active-session deltas are flushed to storage while playing. */
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+/**
+ * How many consecutive persist failures are tolerated before the retry loop
+ * gives up. A permanently failing write (e.g. quota exhausted) must not spin
+ * forever; the next successful schedulePersist() resets the counter.
+ */
+const MAX_PERSIST_RETRIES = 5;
+
+/** Delay before retrying after a failed statistics write. */
+const PERSIST_RETRY_DELAY_MS = 2_000;
 
 interface SessionAccounting {
   session: WatchSession;
@@ -39,7 +54,16 @@ let statsLoading: Promise<Statistics> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 let pendingSnapshot: Statistics | null = null;
 let persistQueued = false;
+let persistFailures = 0;
+let persistRetryTimer: number | null = null;
 let statsSubscriptionUnsub: (() => void) | null = null;
+let heartbeatTimer: number | null = null;
+/**
+ * Set when an external statistics write arrives while sessions are active
+ * (reload deferred to avoid orphaning them). Cleared by re-syncing from
+ * storage once the last session ends.
+ */
+let dirty = false;
 
 function ensureStats(): Promise<Statistics> {
   if (stats !== null) return Promise.resolve(stats);
@@ -70,16 +94,29 @@ function schedulePersist(): void {
         pendingSnapshot = null;
         const res = await StorageService.saveStatistics(snapshot);
         if (!res.ok) {
-          // Re-queue the failed snapshot so a subsequent call to
-          // schedulePersist() will retry. Do not throw to avoid
-          // unhandled rejection in background tasks.
+          persistFailures += 1;
+          if (persistFailures > MAX_PERSIST_RETRIES) {
+            // Give up on this snapshot instead of re-queueing it forever.
+            // Reset the counter so a later schedulePersist() call starts
+            // with a fresh retry budget.
+            persistFailures = 0;
+            break;
+          }
+          // Re-queue the failed snapshot and retry after a delay so a
+          // permanent failure cannot spin the queue tight.
           pendingSnapshot = snapshot;
+          if (persistRetryTimer === null) {
+            persistRetryTimer = window.setTimeout(() => {
+              persistRetryTimer = null;
+              schedulePersist();
+            }, PERSIST_RETRY_DELAY_MS);
+          }
           break;
         }
+        persistFailures = 0;
       }
     } finally {
       persistQueued = false;
-      if (pendingSnapshot !== null) schedulePersist();
     }
   });
 }
@@ -96,8 +133,46 @@ function ensureStatsSubscription(): void {
         notifyStatisticsSubscribers(loaded);
       },
       () => rebaseActiveSessions(Date.now()),
+      () => {
+        dirty = true;
+      },
     );
   });
+}
+
+// ─── Heartbeat flush ─────────────────────────────────────────────────────────
+// Deltas are normally persisted on pause/detach/hidden. If the tab crashes or
+// is closed abruptly, everything since the last such event would be lost.
+// While any session is playing, a heartbeat flushes accrued deltas every
+// HEARTBEAT_INTERVAL_MS so at most one interval's worth of data is at risk.
+
+function hasPlayingSession(): boolean {
+  for (const a of active.values()) {
+    if (a.playingSince >= 0) return true;
+  }
+  return false;
+}
+
+function flushActiveSessions(): void {
+  const now = Date.now();
+  for (const a of active.values()) {
+    void syncActiveSession(a, now);
+  }
+  schedulePersist();
+}
+
+function startHeartbeat(): void {
+  if (heartbeatTimer !== null) return;
+  heartbeatTimer = window.setInterval(() => {
+    if (!hasPlayingSession()) return;
+    flushActiveSessions();
+  }, HEARTBEAT_INTERVAL_MS);
+}
+
+function stopHeartbeat(): void {
+  if (heartbeatTimer === null) return;
+  window.clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
 }
 
 async function syncActiveSession(
@@ -135,13 +210,18 @@ function beginPlaying(
   autoPaused.delete(video);
   a.session.playbackSpeed = sanitizeSpeed(speed);
   a.playingSince = timestamp;
+  startHeartbeat();
 }
 
 function stopPlaying(video: HTMLVideoElement, timestamp: number): void {
   const a = active.get(video);
   if (a === undefined || a.playingSince < 0) return;
+  // Sync BEFORE clearing playingSince: syncActiveSession() reads it to
+  // compute the elapsed interval and returns early when it is already -1.
+  const pending = syncActiveSession(a, timestamp);
   a.playingSince = -1;
-  void syncActiveSession(a, timestamp)
+  if (!hasPlayingSession()) stopHeartbeat();
+  void pending
     .then(schedulePersist)
     .catch(() => {
       // Ensure persist is attempted even if syncing the active session fails.
@@ -165,6 +245,7 @@ function handleAttached(event: PlaybackEvent): void {
     persistedSaved: 0,
   };
   active.set(event.video, a);
+  if (a.playingSince >= 0) startHeartbeat();
   void ensureStats();
 }
 
@@ -174,6 +255,7 @@ function handleDetached(event: PlaybackEvent): void {
 
   active.delete(event.video);
   autoPaused.delete(event.video);
+  if (!hasPlayingSession()) stopHeartbeat();
 
   const pending = syncActiveSession(a, event.timestamp);
 
@@ -195,6 +277,18 @@ function handleDetached(event: PlaybackEvent): void {
       // Guard against unhandled rejections from syncActiveSession.
       schedulePersist();
     });
+
+  // An external write (import/reset in another context) arrived while this
+  // session was active and its reload was deferred. Now that the session has
+  // ended, adopt the canonical record from storage.
+  if (active.size === 0 && dirty) {
+    dirty = false;
+    void StorageService.getStatistics().then((result) => {
+      if (!result.ok) return;
+      stats = result.value;
+      notifyStatisticsSubscribers(result.value);
+    });
+  }
 }
 
 function handlePlay(event: PlaybackEvent): void {
@@ -248,10 +342,12 @@ function notifyHidden(): void {
   const now = Date.now();
   for (const [video, a] of active) {
     if (a.playingSince < 0) continue;
-    a.playingSince = -1;
     autoPaused.add(video);
+    // Sync before clearing playingSince (see stopPlaying).
     void syncActiveSession(a, now);
+    a.playingSince = -1;
   }
+  stopHeartbeat();
   schedulePersist();
 }
 
@@ -259,28 +355,16 @@ function notifyVisible(): void {
   for (const video of autoPaused) {
     const a = active.get(video);
     if (a === undefined) continue;
+    // The session may have resumed on its own (or ended) while hidden;
+    // only re-arm sessions that are actually stopped.
+    if (a.playingSince >= 0) continue;
     if (!video.paused && !video.ended) {
       a.session.playbackSpeed = sanitizeSpeed(video.playbackRate);
       a.playingSince = Date.now();
     }
   }
   autoPaused.clear();
-}
-
-/** Sums the daily buckets of the last 7 days (including today). */
-function summarizeWeek(s: Statistics, now: number): PeriodStats {
-  const week = createEmptyPeriodStats();
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  for (let offset = 0; offset < 7; offset += 1) {
-    const day = s.daily[toDateKey(now - offset * DAY_MS)];
-    if (day === undefined) continue;
-    week.watchedSeconds += day.watchedSeconds;
-    week.savedSeconds += day.savedSeconds;
-    week.sessionCount += day.sessionCount;
-  }
-  week.watchedSeconds = roundSeconds(week.watchedSeconds);
-  week.savedSeconds = roundSeconds(week.savedSeconds);
-  return week;
+  if (hasPlayingSession()) startHeartbeat();
 }
 
 /** Time-weighted average speed across all recorded history segments. */
@@ -345,7 +429,50 @@ async function importStatistics(next: Statistics): Promise<void> {
   notifyStatisticsSubscribers(next);
 }
 
+/**
+ * Flushes accrued session deltas to storage and re-reads the canonical
+ * statistics record. Sent by the popup to every playing tab before an
+ * import/reset so the write is not silently overwritten by a stale
+ * in-memory snapshot afterwards.
+ */
+async function flushAndReload(): Promise<void> {
+  flushActiveSessions();
+  await writeQueue;
+  const result = await StorageService.getStatistics();
+  if (!result.ok) return;
+  stats = result.value;
+  rebaseActiveSessions(Date.now());
+  dirty = false;
+  notifyStatisticsSubscribers(result.value);
+}
+
+/**
+ * Attaches the statistics storage listener. Called by Integration.start()
+ * (not lazily on subscribe) so external writes — e.g. an import or reset
+ * performed in the popup while this tab plays — are observed even when no
+ * popup subscriber exists in this context. Idempotent.
+ */
+function init(): void {
+  ensureStatsSubscription();
+}
+
+/** Tears down timers and the storage subscription. Idempotent. */
+function stop(): void {
+  stopHeartbeat();
+  if (persistRetryTimer !== null) {
+    window.clearTimeout(persistRetryTimer);
+    persistRetryTimer = null;
+  }
+  if (statsSubscriptionUnsub !== null) {
+    statsSubscriptionUnsub();
+    statsSubscriptionUnsub = null;
+  }
+  dirty = false;
+}
+
 export const StatisticsService = {
+  init,
+  stop,
   handlePlaybackEvent,
   notifyHidden,
   notifyVisible,
@@ -354,4 +481,5 @@ export const StatisticsService = {
   exportStatistics,
   subscribeStatistics,
   importStatistics,
+  flushAndReload,
 } as const;

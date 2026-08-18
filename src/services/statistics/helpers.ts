@@ -153,3 +153,28 @@ export function finalizeSessionInStatistics(
   stats.total.sessionCount += 1;
   pushHistory(stats, session);
 }
+
+/**
+ * Sums the daily buckets of the last 7 calendar days (including today).
+ * Walks calendar days instead of subtracting fixed 24h blocks, so the
+ * window stays correct across DST transitions (23h/25h days).
+ */
+export function summarizeWeek(stats: Statistics, now: number): PeriodStats {
+  const week = createEmptyPeriodStats();
+  const anchor = new Date(now);
+  for (let offset = 0; offset < 7; offset += 1) {
+    const day = new Date(
+      anchor.getFullYear(),
+      anchor.getMonth(),
+      anchor.getDate() - offset,
+    );
+    const bucket = stats.daily[toDateKey(day.getTime())];
+    if (bucket === undefined) continue;
+    week.watchedSeconds += bucket.watchedSeconds;
+    week.savedSeconds += bucket.savedSeconds;
+    week.sessionCount += bucket.sessionCount;
+  }
+  week.watchedSeconds = roundSeconds(week.watchedSeconds);
+  week.savedSeconds = roundSeconds(week.savedSeconds);
+  return week;
+}

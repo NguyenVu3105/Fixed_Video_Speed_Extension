@@ -3,11 +3,12 @@ import { SPEED_MAX, SPEED_MIN } from '../config';
 import { VideoController } from './VideoController';
 import { OverlayService } from './OverlayService';
 import { Integration } from './Integration';
+import { StatisticsService } from './statistics';
 
 // ─── Message handling ────────────────────────────────────────────────────────
 // The popup talks to the content script directly via chrome.tabs.sendMessage;
-// this module answers those requests. All handlers are synchronous, so
-// sendResponse is called inline and the listener never returns true.
+// this module answers those requests. Handlers are synchronous except
+// fvs:flush-stats, which responds asynchronously (listener returns true).
 
 function clampSpeed(value: number): number {
   return Math.min(SPEED_MAX, Math.max(SPEED_MIN, value));
@@ -17,7 +18,7 @@ function handleMessage(
   message: unknown,
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response?: unknown) => void,
-): undefined {
+): boolean | undefined {
   if (
     typeof message !== 'object' ||
     message === null ||
@@ -49,6 +50,18 @@ function handleMessage(
     case 'fvs:preview': {
       sendResponse({ shown: OverlayService.preview() });
       break;
+    }
+    case 'fvs:flush-stats': {
+      // Async: flush accrued session deltas, then re-read the canonical
+      // record. Keep the message channel open until it completes.
+      void StatisticsService.flushAndReload()
+        .then(() => {
+          sendResponse({ ok: true });
+        })
+        .catch(() => {
+          sendResponse({ ok: false });
+        });
+      return true;
     }
   }
   return undefined;

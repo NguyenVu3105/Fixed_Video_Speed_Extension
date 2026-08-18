@@ -125,13 +125,19 @@ export function findCustomSite(
   );
 }
 
-/** Built-in platforms are always enabled; custom pages require a saved rule. */
+/**
+ * A host is supported when it matches a built-in platform that is enabled in
+ * `supportedSites`, or when a custom-domain rule exists for it. Custom rules
+ * are user-owned and always apply; `supportedSites` only gates built-ins.
+ * When `supportedSites` is omitted, every built-in platform is enabled.
+ */
 export function isHostSupported(
   host: string,
   customSites: readonly CustomSite[],
+  supportedSites?: readonly BuiltInSiteType[],
 ): boolean {
-  return (
-    getSiteDefinition(host) !== null ||
-    findCustomSite(host, customSites) !== null
-  );
+  if (findCustomSite(host, customSites) !== null) return true;
+  const definition = getSiteDefinition(host);
+  if (definition === null) return false;
+  return supportedSites === undefined || supportedSites.includes(definition.type);
 }

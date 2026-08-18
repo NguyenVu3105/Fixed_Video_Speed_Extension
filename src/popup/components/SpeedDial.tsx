@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactElement,
+} from 'react';
 import { DIAL_STEP, DIAL_TICKS, SPEED_MAX, SPEED_MIN } from '../constants';
 import { useI18n } from '../i18n';
 
@@ -33,6 +37,13 @@ const SWEEP = 270;
 
 /** Ignore the `speed` prop this long after our own last emission. */
 const ECHO_GRACE_MS = 250;
+
+/**
+ * Parent notifications during a drag are debounced by this much — a sweep
+ * from 1x to 16x walks ~60 steps, and each step used to write to storage.
+ * The final value is flushed immediately on pointer-up / key press.
+ */
+const COMMIT_DEBOUNCE_MS = 120;
 
 function clampSpeed(value: number): number {
   return Math.min(SPEED_MAX, Math.max(SPEED_MIN, value));
@@ -94,6 +105,7 @@ export function SpeedDial({ speed, onChange }: SpeedDialProps): ReactElement {
   const targetRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastEmitTimeRef = useRef(0);
+  const commitTimerRef = useRef<number | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -111,6 +123,7 @@ export function SpeedDial({ speed, onChange }: SpeedDialProps): ReactElement {
   useEffect(
     () => () => {
       if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+      if (commitTimerRef.current !== null) window.clearTimeout(commitTimerRef.current);
     },
     [],
   );
@@ -123,6 +136,31 @@ export function SpeedDial({ speed, onChange }: SpeedDialProps): ReactElement {
     onChangeRef.current(next);
   }, []);
 
+  /** Cancels any pending debounced notification and notifies immediately. */
+  const flushCommit = useCallback((next: number): void => {
+    if (commitTimerRef.current !== null) {
+      window.clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+    }
+    commit(next);
+  }, [commit]);
+
+  /**
+   * Notifies the parent at most once per COMMIT_DEBOUNCE_MS while the value
+   * is walking toward a drag target; local state still updates every step
+   * so the dial stays smooth.
+   */
+  const emitDebounced = useCallback((next: number): void => {
+    valueRef.current = next;
+    setValue(next);
+    lastEmitTimeRef.current = Date.now();
+    if (commitTimerRef.current !== null) return;
+    commitTimerRef.current = window.setTimeout(() => {
+      commitTimerRef.current = null;
+      onChangeRef.current(valueRef.current);
+    }, COMMIT_DEBOUNCE_MS);
+  }, []);
+
   /** Advances the value one DIAL_STEP toward the target, each frame. */
   const stepTowardTarget = useCallback((): void => {
     rafRef.current = null;
@@ -131,14 +169,14 @@ export function SpeedDial({ speed, onChange }: SpeedDialProps): ReactElement {
     const current = valueRef.current;
     if (Math.abs(target - current) < DIAL_STEP / 2) {
       targetRef.current = null;
-      if (target !== current) commit(target);
+      if (target !== current) emitDebounced(target);
       return;
     }
     const next =
       target > current ? current + DIAL_STEP : current - DIAL_STEP;
-    commit(clampSpeed(Math.round(next * 100) / 100));
+    emitDebounced(clampSpeed(Math.round(next * 100) / 100));
     rafRef.current = window.requestAnimationFrame(stepTowardTarget);
-  }, [commit]);
+  }, [emitDebounced]);
 
   /** Sets the drag target; the stepping loop walks the value toward it. */
   const moveTo = useCallback(
@@ -189,6 +227,43 @@ export function SpeedDial({ speed, onChange }: SpeedDialProps): ReactElement {
 
   const handlePointerUp = (): void => {
     draggingRef.current = false;
+    // The walk may still be finishing after release; whenever it lands (or
+    // the value already sits on the target) the final value is committed
+    // immediately so the last step is never lost to the debounce window.
+    if (targetRef.current === null) flushCommit(valueRef.current);
+  };
+
+  /** Keyboard support: arrows step by DIAL_STEP, Page keys by 1x, Home/End jump. */
+  const handleKeyDown = (event: ReactKeyboardEvent<SVGSVGElement>): void => {
+    let next: number | null = null;
+    const current = valueRef.current;
+    switch (event.key) {
+      case 'ArrowUp':
+      case 'ArrowRight':
+        next = clampSpeed(Math.round((current + DIAL_STEP) * 100) / 100);
+        break;
+      case 'ArrowDown':
+      case 'ArrowLeft':
+        next = clampSpeed(Math.round((current - DIAL_STEP) * 100) / 100);
+        break;
+      case 'PageUp':
+        next = clampSpeed(Math.round((current + 1) * 100) / 100);
+        break;
+      case 'PageDown':
+        next = clampSpeed(Math.round((current - 1) * 100) / 100);
+        break;
+      case 'Home':
+        next = SPEED_MIN;
+        break;
+      case 'End':
+        next = SPEED_MAX;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    targetRef.current = null;
+    flushCommit(next);
   };
 
   const t = speedToT(value);
@@ -201,14 +276,18 @@ export function SpeedDial({ speed, onChange }: SpeedDialProps): ReactElement {
         className="speed-dial__svg"
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
         role="slider"
+        tabIndex={0}
         aria-label={tr('speed.dial')}
         aria-valuemin={SPEED_MIN}
         aria-valuemax={SPEED_MAX}
         aria-valuenow={value}
+        aria-valuetext={`${value.toFixed(2)}x`}
+        style={{ touchAction: 'none' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onKeyDown={handleKeyDown}
       >
         <defs>
           <linearGradient id="dial-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
