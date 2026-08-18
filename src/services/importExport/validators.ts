@@ -92,7 +92,7 @@ function validateSite(v: unknown): Result<SiteType> {
   if (typeof v === 'string' && VALID_SITES.includes(v)) {
     return { ok: true, value: v as SiteType };
   }
-  return fail('"site" must be one of: youtube | bilibili | other');
+  return fail(`"site" must be one of: ${VALID_SITES.join(' | ')}`);
 }
 
 function validateSegment(v: unknown): Result<PlaybackSegment> {

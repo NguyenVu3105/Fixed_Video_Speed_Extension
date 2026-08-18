@@ -115,9 +115,12 @@ export async function importData(jsonText: string, mode: ImportMode): Promise<Re
   if (!payloadR.ok) return { ok: false, error: payloadR.error };
   const { settings: importedSettings, statistics: importedStats } = payloadR.value;
 
-  // 3. Read current statistics (needed for merge)
+  // 3. Read current statistics (needed for merge) and the current settings
+  //    (captured now so a failed statistics write can roll back to them).
   const currentStatsR = await StorageService.getStatistics();
   if (!currentStatsR.ok) return { ok: false, error: currentStatsR.error };
+  const previousSettingsR = await StorageService.getSettings();
+  if (!previousSettingsR.ok) return { ok: false, error: previousSettingsR.error };
 
   // 4. Compute final statistics (total always recalculated from daily)
   const finalStats: Statistics = buildFinalStatistics(mode, currentStatsR.value, importedStats);
@@ -133,10 +136,10 @@ export async function importData(jsonText: string, mode: ImportMode): Promise<Re
     await StatisticsService.importStatistics(finalStats);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    // Attempt rollback to previous settings so storage stays consistent
-    const rollbackR = await StorageService.saveSettings(
-      await StorageService.getSettings().then((r) => (r.ok ? r.value : importedSettings)),
-    );
+    // Restore the settings captured before the import so storage stays
+    // consistent. (Re-reading here would return the just-saved imported
+    // settings, so the snapshot taken in step 3 is used instead.)
+    const rollbackR = await StorageService.saveSettings(previousSettingsR.value);
     if (!rollbackR.ok) return { ok: false, error: `Import failed and rollback failed: ${rollbackR.error}` };
     return { ok: false, error: message };
   }
